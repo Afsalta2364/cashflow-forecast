@@ -58,11 +58,16 @@ if uploaded_file:
 
     df["Week Range"] = df["Week"].apply(format_week_range)
 
-    # Summarize by Party + Week
-    pivot_df = df.groupby(["Party Type", "Party Name", "Week Range"])["Amount"].sum().reset_index()
+    # ✅ Fix: Ensure all party-week combinations exist
+    all_parties = df[["Party Type", "Party Name"]].drop_duplicates()
+    all_weeks = pd.DataFrame(df["Week Range"].unique(), columns=["Week Range"])
+    all_cross = all_parties.merge(all_weeks, how="cross")
 
-    # Pivot to wide format
-    detailed = pivot_df.pivot_table(
+    pivot_df = df.groupby(["Party Type", "Party Name", "Week Range"], as_index=False)["Amount"].sum()
+    complete_df = all_cross.merge(pivot_df, on=["Party Type", "Party Name", "Week Range"], how="left").fillna(0)
+
+    # Pivot to final table
+    detailed = complete_df.pivot_table(
         index=["Party Type", "Party Name"],
         columns="Week Range",
         values="Amount",
@@ -75,7 +80,7 @@ if uploaded_file:
     net_row = pd.DataFrame([net_cashflow], index=pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
     detailed = pd.concat([detailed, net_row])
 
-    # Display Table
+    # Display table
     st.markdown("### 📋 Detailed Weekly Cashflow")
     st.dataframe(detailed.style.format("{:,.0f}"), use_container_width=True)
 
