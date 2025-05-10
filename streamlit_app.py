@@ -76,19 +76,19 @@ if uploaded_file:
     st.markdown("### 📋 Detailed Weekly Cashflow")
     st.dataframe(detailed.style.format("{:,.0f}"), use_container_width=True)
 
-    # Altair chart
+    # Altair chart (Fixed version)
     st.markdown("### 📈 Weekly Net Cashflow Trend")
     net_df = net_cashflow.reset_index()
     net_df.columns = ["Week", "Net Cashflow"]
     net_df["Week"] = pd.Categorical(net_df["Week"], categories=net_df["Week"], ordered=True)
 
-    chart = alt.Chart(net_df).mark_bar(cornerRadiusTop=4).encode(
+    chart = alt.Chart(net_df).mark_bar().encode(
         x=alt.X("Week:N", title=None, sort=None),
         y=alt.Y("Net Cashflow:Q", title="Net Cashflow"),
         color=alt.condition(
             alt.datum["Net Cashflow"] > 0,
-            alt.value("#4CAF50"),  # green
-            alt.value("#EF5350")   # red
+            alt.value("#4CAF50"),
+            alt.value("#EF5350")
         ),
         tooltip=["Week", "Net Cashflow"]
     ).properties(
