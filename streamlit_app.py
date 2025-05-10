@@ -58,7 +58,7 @@ if uploaded_file:
 
     df["Week Range"] = df["Week"].apply(format_week_range)
 
-    # ✅ Fix: ensure all party-week combinations are included
+    # Ensure all party-week combinations exist
     all_parties = df[["Party Type", "Party Name"]].drop_duplicates()
     all_weeks = pd.DataFrame(df["Week Range"].unique(), columns=["Week Range"])
     all_cross = all_parties.merge(all_weeks, how="cross")
@@ -66,8 +66,8 @@ if uploaded_file:
     pivot_df = df.groupby(["Party Type", "Party Name", "Week Range"], as_index=False)["Amount"].sum()
     complete_df = all_cross.merge(pivot_df, on=["Party Type", "Party Name", "Week Range"], how="left").fillna(0)
 
-    # Final pivot
-    detailed = complete_df.pivot_table(
+    # Full breakdown table: Party Type + Name as index, weeks as columns
+    wide_df = complete_df.pivot_table(
         index=["Party Type", "Party Name"],
         columns="Week Range",
         values="Amount",
@@ -75,16 +75,16 @@ if uploaded_file:
         fill_value=0
     )
 
-    # Net cashflow row
-    net_cashflow = detailed.sum(numeric_only=True)
+    # Add Net Cashflow row
+    net_cashflow = wide_df.sum(numeric_only=True)
     net_row = pd.DataFrame([net_cashflow], index=pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
-    detailed = pd.concat([detailed, net_row])
+    final_table = pd.concat([wide_df, net_row])
 
-    # Display table
+    # Display final table
     st.markdown("### 📋 Detailed Weekly Cashflow")
-    st.dataframe(detailed.style.format("{:,.0f}"), use_container_width=True)
+    st.dataframe(final_table.style.format("{:,.0f}"), use_container_width=True)
 
-    # Net cashflow chart
+    # Chart: Weekly Net Cashflow
     st.markdown("### 📈 Weekly Net Cashflow Trend")
     net_df = net_cashflow.reset_index()
     net_df.columns = ["Week", "Net Cashflow"]
@@ -115,10 +115,10 @@ if uploaded_file:
 
     st.altair_chart((bar_chart + labels).properties(height=300), use_container_width=True)
 
-    # Excel export
+    # Excel Export
     towrite = BytesIO()
     with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
-        detailed.to_excel(writer, sheet_name='Forecast')
+        final_table.to_excel(writer, sheet_name='Forecast')
     st.download_button("📤 Download Forecast Excel", towrite.getvalue(), file_name="cashflow_forecast.xlsx")
 
 else:
