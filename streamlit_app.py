@@ -1,12 +1,12 @@
 import streamlit as st
 import pandas as pd
-import matplotlib.pyplot as plt
+import altair as alt
 from io import BytesIO
 
-# Configure page
+# --- Page config ---
 st.set_page_config(page_title="Cashflow Forecast", layout="wide")
 
-# Style
+# --- CSS styling ---
 st.markdown("""
     <style>
     .main { background-color: #f4f6f9; }
@@ -22,9 +22,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- Title ---
 st.markdown("<h1>💰 Weekly Cashflow Forecast Dashboard</h1>", unsafe_allow_html=True)
 
-# Downloadable template
+# --- Template Download ---
 with st.expander("📥 Download Template"):
     sample_data = pd.DataFrame({
         "Party Type": ["Supplier", "Customer"],
@@ -33,22 +34,21 @@ with st.expander("📥 Download Template"):
         "Expected Date": ["2025-05-20", "2025-05-14"],
         "Amount": [-10000, 12000]
     })
-    st.download_button("Download CSV Template",
-                       sample_data.to_csv(index=False).encode(),
-                       file_name="cashflow_template.csv",
-                       mime="text/csv")
+    st.download_button(
+        "Download CSV Template",
+        data=sample_data.to_csv(index=False).encode(),
+        file_name="cashflow_template.csv",
+        mime="text/csv"
+    )
 
-# Upload file
+# --- Upload ---
 st.markdown("### 📤 Upload Cashflow Data")
 uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
 
 if uploaded_file:
-    # Load data
     df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
     df["Due Date"] = pd.to_datetime(df["Due Date"])
     df["Expected Date"] = pd.to_datetime(df["Expected Date"])
-
-    # Allocation logic
     df["Allocation Date"] = df[["Due Date", "Expected Date"]].max(axis=1)
     df["Week"] = df["Allocation Date"].dt.to_period("W").apply(lambda r: r.start_time)
 
@@ -58,7 +58,7 @@ if uploaded_file:
 
     df["Week Range"] = df["Week"].apply(format_week_range)
 
-    # Pivot table
+    # Pivot data
     detailed = df.pivot_table(
         index=["Party Type", "Party Name"],
         columns="Week Range",
@@ -67,25 +67,40 @@ if uploaded_file:
         fill_value=0
     )
 
-    # Calculate Net Cashflow per week
+    # Calculate Net Cashflow
     net_cashflow = detailed.sum(numeric_only=True)
-
-    # Reindex as a multi-index row and append
     net_row = pd.DataFrame([net_cashflow], index=pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
     detailed = pd.concat([detailed, net_row])
 
-    # Show data
+    # Show DataFrame
     st.markdown("### 📋 Detailed Weekly Cashflow")
     st.dataframe(detailed.style.format("{:,.0f}"), use_container_width=True)
 
-    # Net Cashflow Chart
+    # Altair chart
     st.markdown("### 📈 Weekly Net Cashflow Trend")
     net_df = net_cashflow.reset_index()
     net_df.columns = ["Week", "Net Cashflow"]
-    fig, ax = plt.subplots()
-    ax.bar(net_df["Week"], net_df["Net Cashflow"], color="#4CAF50")
-    plt.xticks(rotation=45)
-    st.pyplot(fig)
+    net_df["Week"] = pd.Categorical(net_df["Week"], categories=net_df["Week"], ordered=True)
+
+    chart = alt.Chart(net_df).mark_bar(cornerRadiusTop=4).encode(
+        x=alt.X("Week:N", title=None, sort=None),
+        y=alt.Y("Net Cashflow:Q", title="Net Cashflow"),
+        color=alt.condition(
+            alt.datum["Net Cashflow"] > 0,
+            alt.value("#4CAF50"),  # green
+            alt.value("#EF5350")   # red
+        ),
+        tooltip=["Week", "Net Cashflow"]
+    ).properties(
+        width="container",
+        height=300
+    ).configure_axis(
+        labelAngle=0
+    ).configure_view(
+        stroke=None
+    )
+
+    st.altair_chart(chart, use_container_width=True)
 
     # Export
     towrite = BytesIO()
@@ -94,4 +109,4 @@ if uploaded_file:
     st.download_button("📤 Download Forecast Excel", towrite.getvalue(), file_name="cashflow_forecast.xlsx")
 
 else:
-    st.info("Please upload your file to get started.")
+    st.info("Please upload your file to see the forecast.")
