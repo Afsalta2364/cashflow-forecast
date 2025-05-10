@@ -76,14 +76,14 @@ if uploaded_file:
     st.markdown("### 📋 Detailed Weekly Cashflow")
     st.dataframe(detailed.style.format("{:,.0f}"), use_container_width=True)
 
-    # Altair chart (Fixed version)
+    # Net Cashflow Chart with labels
     st.markdown("### 📈 Weekly Net Cashflow Trend")
     net_df = net_cashflow.reset_index()
     net_df.columns = ["Week", "Net Cashflow"]
     net_df["Week"] = pd.Categorical(net_df["Week"], categories=net_df["Week"], ordered=True)
 
-    chart = alt.Chart(net_df).mark_bar().encode(
-        x=alt.X("Week:N", title=None, sort=None),
+    bar_chart = alt.Chart(net_df).mark_bar().encode(
+        x=alt.X("Week:N", title=None),
         y=alt.Y("Net Cashflow:Q", title="Net Cashflow"),
         color=alt.condition(
             alt.datum["Net Cashflow"] > 0,
@@ -91,7 +91,21 @@ if uploaded_file:
             alt.value("#EF5350")
         ),
         tooltip=["Week", "Net Cashflow"]
-    ).properties(
+    )
+
+    labels = alt.Chart(net_df).mark_text(
+        align="center",
+        baseline="bottom",
+        dy=-5,
+        fontSize=12
+    ).encode(
+        x="Week:N",
+        y="Net Cashflow:Q",
+        text=alt.Text("Net Cashflow:Q", format=",.0f"),
+        color=alt.value("black")
+    )
+
+    final_chart = (bar_chart + labels).properties(
         width="container",
         height=300
     ).configure_axis(
@@ -100,7 +114,7 @@ if uploaded_file:
         stroke=None
     )
 
-    st.altair_chart(chart, use_container_width=True)
+    st.altair_chart(final_chart, use_container_width=True)
 
     # Export
     towrite = BytesIO()
