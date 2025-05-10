@@ -1,48 +1,60 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 from io import BytesIO
 
-# Page configuration
-st.set_page_config(page_title="Cashflow Forecast Dashboard", layout="wide")
+# --- Layout and style ---
+st.set_page_config(page_title="Cashflow Forecast", layout="wide")
 
-# Styles
 st.markdown("""
     <style>
-    .main { background-color: #f7f9fc; }
-    h1, h2, h3 { color: #1f77b4; }
-    .css-1d391kg { background-color: #ffffff; padding: 1rem; border-radius: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+    .main {
+        background-color: #f4f6f9;
+    }
+    .block-container {
+        padding: 2rem;
+    }
+    h1 {
+        color: #004085;
+    }
+    .card {
+        background-color: white;
+        padding: 2rem;
+        border-radius: 16px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        margin-bottom: 2rem;
+    }
     </style>
 """, unsafe_allow_html=True)
 
-# App title
-st.title("📊 Weekly Cashflow Forecast Tool")
+# --- App Title ---
+st.markdown("<h1>💰 Weekly Cashflow Forecast Dashboard</h1>", unsafe_allow_html=True)
 
-st.markdown("Upload a cashflow file based on the template below and get a clean, detailed weekly forecast.")
+# --- Downloadable Template ---
+with st.expander("📥 Download Data Template", expanded=False):
+    sample_data = pd.DataFrame({
+        "Party Type": ["Supplier", "Customer"],
+        "Party Name": ["ABC Ltd", "XYZ Inc"],
+        "Due Date": ["2025-05-13", "2025-05-10"],
+        "Expected Date": ["2025-05-20", "2025-05-14"],
+        "Amount": [-10000, 12000]
+    })
+    st.download_button(
+        "Download CSV Template",
+        sample_data.to_csv(index=False).encode(),
+        file_name="cashflow_template.csv",
+        mime="text/csv"
+    )
 
-# Template
-sample_data = pd.DataFrame({
-    "Party Type": ["Supplier", "Customer"],
-    "Party Name": ["ABC Ltd", "XYZ Inc"],
-    "Due Date": ["2025-05-13", "2025-05-10"],
-    "Expected Date": ["2025-05-20", "2025-05-14"],
-    "Amount": [-10000, 12000]
-})
-csv = sample_data.to_csv(index=False).encode()
-st.download_button("📥 Download Template", data=csv, file_name="cashflow_template.csv", mime="text/csv")
+# --- File Upload ---
+st.markdown("### 📤 Upload Your Cashflow Data")
+uploaded_file = st.file_uploader("Choose your CSV or Excel file", type=["csv", "xlsx"])
 
-# Upload section
-st.markdown("### 📤 Upload Your Data")
-uploaded_file = st.file_uploader("Upload a CSV or Excel file based on the template above", type=["csv", "xlsx"])
-
+# --- Process Uploaded File ---
 if uploaded_file:
-    # Read data
     df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
-
-    # Process dates
     df["Due Date"] = pd.to_datetime(df["Due Date"])
     df["Expected Date"] = pd.to_datetime(df["Expected Date"])
-
-    # Allocation logic
     df["Allocation Date"] = df[["Due Date", "Expected Date"]].max(axis=1)
     df["Week"] = df["Allocation Date"].dt.to_period("W").apply(lambda r: r.start_time)
 
@@ -61,37 +73,38 @@ if uploaded_file:
         fill_value=0
     )
 
-    # Add Net Cashflow row
+    # Net cashflow row
     try:
         net_cashflow = detailed_breakup.loc["Customer"].sum() + detailed_breakup.loc["Supplier"].sum()
     except KeyError:
         net_cashflow = detailed_breakup.sum()
     detailed_breakup.loc[("Net Cashflow", "")] = net_cashflow
 
-    # Display
-    st.markdown("### 💸 Detailed Weekly Cashflow View")
-    st.dataframe(detailed_breakup.style
-                 .format("{:,.0f}")
-                 .background_gradient(cmap="Greens", axis=1)
-                 .set_table_styles([{
-                     'selector': 'th',
-                     'props': [('background-color', '#e3f2fd')]
-                 }])
+    # Show data in styled container
+    st.markdown("<div class='card'><h3>📋 Detailed Weekly Cashflow</h3>", unsafe_allow_html=True)
+    st.dataframe(
+        detailed_breakup.style.format("{:,.0f}"),
+        use_container_width=True
     )
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    # Chart
-    st.markdown("### 📈 Net Cashflow Over Time")
+    # Chart section
+    st.markdown("<div class='card'><h3>📈 Weekly Net Cashflow Trend</h3>", unsafe_allow_html=True)
+    fig, ax = plt.subplots()
     net_cashflow_chart = net_cashflow.reset_index()
-    net_cashflow_chart.columns = ["Week Range", "Net Cashflow"]
-    net_cashflow_chart = net_cashflow_chart.set_index("Week Range")
-    st.bar_chart(net_cashflow_chart)
+    net_cashflow_chart.columns = ["Week", "Net"]
+    ax.bar(net_cashflow_chart["Week"], net_cashflow_chart["Net"])
+    ax.set_ylabel("Net Cashflow")
+    ax.set_title("Net Cashflow by Week")
+    plt.xticks(rotation=45)
+    st.pyplot(fig)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    # Export to Excel
+    # Export
     towrite = BytesIO()
-    output = pd.ExcelWriter(towrite, engine='xlsxwriter')
-    detailed_breakup.to_excel(output, sheet_name='Cashflow Forecast')
-    output.close()
-    st.download_button("📤 Download Forecast as Excel", data=towrite.getvalue(), file_name="cashflow_forecast.xlsx")
+    with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
+        detailed_breakup.to_excel(writer, sheet_name='Forecast')
+    st.download_button("📤 Download Forecast Excel", towrite.getvalue(), file_name="cashflow_forecast.xlsx")
 
 else:
-    st.info("Awaiting file upload to show forecast view.")
+    st.info("Please upload your file to generate the forecast.")
