@@ -10,10 +10,3 @@ This is a clean and intuitive Streamlit application to upload cashflow data and 
 - Automatic net cashflow calculation
 - Downloadable Excel output
 
-## 📦 Setup
-
-```bash
-git clone https://github.com/your-username/cashflow-forecast-streamlit.git
-cd cashflow-forecast-streamlit
-pip install -r requirements.txt
-streamlit run streamlit_app.py
