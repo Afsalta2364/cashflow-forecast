@@ -3,10 +3,10 @@ import pandas as pd
 import altair as alt
 from io import BytesIO
 
-# --- Page config ---
+# Page config
 st.set_page_config(page_title="Cashflow Forecast", layout="wide")
 
-# --- CSS styling ---
+# Styling
 st.markdown("""
     <style>
     .main { background-color: #f4f6f9; }
@@ -22,17 +22,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- Title ---
+# Title
 st.markdown("<h1>💰 Weekly Cashflow Forecast Dashboard</h1>", unsafe_allow_html=True)
 
-# --- Template Download ---
+# Template Download
 with st.expander("📥 Download Template"):
     sample_data = pd.DataFrame({
-        "Party Type": ["Supplier", "Customer"],
-        "Party Name": ["ABC Ltd", "XYZ Inc"],
-        "Due Date": ["2025-05-13", "2025-05-10"],
-        "Expected Date": ["2025-05-20", "2025-05-14"],
-        "Amount": [-10000, 12000]
+        "Party Type": ["Supplier", "Customer", "Supplier"],
+        "Party Name": ["ABC Ltd", "XYZ Inc", "RST Ltd"],
+        "Due Date": ["2025-05-13", "2025-05-10", "2025-05-22"],
+        "Expected Date": ["2025-05-20", "2025-05-14", "2025-05-28"],
+        "Amount": [-10000, 12000, -5000]
     })
     st.download_button(
         "Download CSV Template",
@@ -41,7 +41,7 @@ with st.expander("📥 Download Template"):
         mime="text/csv"
     )
 
-# --- Upload ---
+# File Upload
 st.markdown("### 📤 Upload Cashflow Data")
 uploaded_file = st.file_uploader("Upload a CSV or Excel file", type=["csv", "xlsx"])
 
@@ -58,8 +58,11 @@ if uploaded_file:
 
     df["Week Range"] = df["Week"].apply(format_week_range)
 
-    # Pivot data
-    detailed = df.pivot_table(
+    # Summarize by Party + Week
+    pivot_df = df.groupby(["Party Type", "Party Name", "Week Range"])["Amount"].sum().reset_index()
+
+    # Pivot to wide format
+    detailed = pivot_df.pivot_table(
         index=["Party Type", "Party Name"],
         columns="Week Range",
         values="Amount",
@@ -72,11 +75,11 @@ if uploaded_file:
     net_row = pd.DataFrame([net_cashflow], index=pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
     detailed = pd.concat([detailed, net_row])
 
-    # Show DataFrame
+    # Display Table
     st.markdown("### 📋 Detailed Weekly Cashflow")
     st.dataframe(detailed.style.format("{:,.0f}"), use_container_width=True)
 
-    # Net Cashflow Chart with labels
+    # Net Cashflow Chart
     st.markdown("### 📈 Weekly Net Cashflow Trend")
     net_df = net_cashflow.reset_index()
     net_df.columns = ["Week", "Net Cashflow"]
@@ -116,7 +119,7 @@ if uploaded_file:
 
     st.altair_chart(final_chart, use_container_width=True)
 
-    # Export
+    # Export to Excel
     towrite = BytesIO()
     with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
         detailed.to_excel(writer, sheet_name='Forecast')
