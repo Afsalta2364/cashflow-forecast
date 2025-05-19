@@ -1,16 +1,313 @@
+import streamlit as st
+import pandas as pd
+import altair as alt
+from io import BytesIO
+import matplotlib # For background_gradient (though custom function is used now)
+import numpy as np
+
+# --- Page Setup ---
+st.set_page_config(
+    page_title="Cashflow Forecast Dashboard",
+    page_icon="💰",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- Custom CSS for Dark Theme ---
+st.markdown("""
+<style>
+    /* --- Global Styles for Dark Theme --- */
+    body {
+        font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+        color: #e0e0e0;
+        background-color: #121212; /* Standard dark theme background */
+    }
+
+    /* --- Main Title Area --- */
+    .main-title-container {
+        padding: 25px 20px;
+        background: #1f2937; /* Dark blue-grey, slightly lighter than body */
+        border-radius: 8px;
+        margin-bottom: 30px;
+        text-align: center;
+        border: 1px solid #374151; /* Subtle border */
+    }
+    .main-title {
+        font-size: 2.4em;
+        color: #ffffff; /* White for high contrast */
+        font-weight: 600;
+        letter-spacing: 0.5px;
+    }
+    .main-subtitle {
+        font-size: 1.1em;
+        color: #9ca3af; /* Lighter grey for subtitle */
+        margin-top: 5px;
+    }
+
+    /* --- Subheader Styling (st.subheader) --- */
+    h2 {
+        color: #d1d5db; /* Light grey, almost white */
+        border-bottom: 1px solid #4b5563; /* Darker grey accent line */
+        padding-bottom: 8px;
+        margin-top: 35px;
+        margin-bottom: 20px;
+        font-weight: 500;
+        font-size: 1.4em;
+        text-align: left;
+    }
+
+    /* --- Sidebar --- */
+    section[data-testid="stSidebar"] {
+        background-color: #1f2937; /* Consistent dark element background */
+        border-right: 1px solid #374151;
+    }
+    section[data-testid="stSidebar"] h1 { /* Sidebar Title "Inputs & Settings" */
+        color: #60a5fa !important; /* Bright blue accent */
+        font-weight: 500 !important; text-align: center !important;
+        border-bottom: 1px solid #3b82f6 !important; /* Brighter blue border */
+        padding-bottom: 10px !important; font-size: 1.3em !important;
+        margin-top: 5px !important;
+    }
+    .streamlit-expanderHeader { /* Expander header in sidebar */
+        font-size: 1.0em !important; font-weight: normal !important;
+        color: #d1d5db !important;
+        padding: 8px 0px !important;
+    }
+    .streamlit-expanderHeader:hover {
+        color: #93c5fd !important; /* Lighter blue on hover */
+    }
+    section[data-testid="stSidebar"] .stFileUploader label { /* File uploader label */
+        color: #d1d5db !important;
+        font-size: 0.95em !important;
+    }
+    section[data-testid="stSidebar"] .stButton>button { /* Buttons in sidebar (like "Download Template") */
+        background-color: #3b82f6; /* Accent blue */
+        color: white !important;
+        border: none;
+        border-radius: 6px;
+        padding: 8px 16px;
+        font-size: 0.9em;
+    }
+    section[data-testid="stSidebar"] .stButton>button:hover {
+        background-color: #2563eb;
+    }
+
+
+    /* --- Metric Cards --- */
+    div[data-testid="stMetric"] {
+        background-color: #1f2937; /* Dark element background */
+        border: 1px solid #374151; /* Subtle border */
+        border-radius: 8px; padding: 18px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06); /* Subtle shadow for depth */
+        height: 100%;
+    }
+    .stMetric > div > div:nth-child(1) { /* Label */
+        color: #9ca3af; /* Muted light grey for label */
+        font-size: 0.85em; font-weight: 400; margin-bottom: 6px;
+        text-transform: uppercase; /* Uppercase labels */
+        letter-spacing: 0.5px;
+    }
+    .stMetric > div > div:nth-child(2) { /* Value */
+        color: #f3f4f6; /* Very light grey, almost white */
+        font-size: 1.9em; font-weight: 600;
+    }
+    .stMetric > div > div:nth-child(3) { /* Delta */
+        font-size: 0.9em; font-weight: 500;
+    }
+    .stMetric [data-testid="stMetricDelta"] svg { visibility: visible !important; }
+
+
+    /* --- Main Buttons (e.g., Download Forecast Excel) --- */
+    .stDownloadButton>button { /* Main download button */
+        background-color: #10b981; /* Emerald green accent */
+        color: white !important;
+        border: none; border-radius: 6px;
+        font-weight: 500; padding: 10px 22px;
+        font-size: 0.95em;
+    }
+    .stDownloadButton>button:hover {
+        background-color: #059669; /* Darker green */
+    }
+
+    /* --- Alert Messages Styling --- */
+    div[data-testid="stAlert"] { border-radius: 6px; border-width: 1px; border-style: solid; padding: 12px 15px; font-size: 0.9em;}
+    div[data-testid="stAlert"][data-baseweb="alert-success"] { background-color: rgba(16, 185, 129, 0.15); border-color: #10b981; color: #a7f3d0; }
+    div[data-testid="stAlert"][data-baseweb="alert-success"] svg { fill: #a7f3d0; }
+    div[data-testid="stAlert"][data-baseweb="alert-info"] { background-color: rgba(59, 130, 246, 0.15); border-color: #3b82f6; color: #bfdbfe; }
+    div[data-testid="stAlert"][data-baseweb="alert-info"] svg { fill: #bfdbfe; }
+    div[data-testid="stAlert"][data-baseweb="alert-warning"] { background-color: rgba(245, 158, 11, 0.15); border-color: #f59e0b; color: #fde68a; }
+    div[data-testid="stAlert"][data-baseweb="alert-warning"] svg { fill: #fde68a; }
+    div[data-testid="stAlert"][data-baseweb="alert-error"] { background-color: rgba(239, 68, 68, 0.15); border-color: #ef4444; color: #fecaca; }
+    div[data-testid="stAlert"][data-baseweb="alert-error"] svg { fill: #fecaca; }
+
+    /* --- Dataframe Styling (Wrapper for st.dataframe AND st.markdown table) --- */
+    .stDataFrame {
+        border: 1px solid #374151; /* Border for st.dataframe */
+        border-radius: 6px;
+        overflow: hidden; /* Ensures border-radius applies to table content */
+    }
+    div.stMarkdown > div[data-testid="element-container"] > div { /* This is the direct parent of the <table> */
+        display: flex;
+        justify-content: center; /* Center the table within this div */
+        width: 100%; /* Ensure the div takes full available width to allow centering */
+    }
+    div.stMarkdown > div[data-testid="element-container"] > div > table {
+        margin-bottom: 15px; /* Space after table */
+    }
+
+    .stApp > footer { visibility: hidden; }
+    hr { border-top: 1px solid #374151; margin-top: 25px; margin-bottom: 25px; }
+</style>
+""", unsafe_allow_html=True)
+
+# --- Main Title Section ---
+st.markdown("""
+<div class='main-title-container'>
+    <div class='main-title'>💰 Weekly Cashflow Forecast</div>
+    <div class='main-subtitle'>Upload data to visualize your projected financial health.</div>
+</div>
+""", unsafe_allow_html=True)
+st.divider()
+
+# --- Helper Functions ---
+def format_week_range(start_date):
+    end_date = start_date + pd.Timedelta(days=6)
+    return f"{start_date.day} {start_date.strftime('%b')} - {end_date.day} {end_date.strftime('%b')}"
+
+def style_table(df_to_style):
+    numeric_cols = df_to_style.select_dtypes(include='number').columns.tolist()
+    text_color_light = "#d1d5db"; text_color_faint = "#6b7280"
+    bg_header = "#1f2937"; bg_index_cols = "#111827"
+    bg_data_cells = "#1f2937"; bg_net_cashflow = "#2b394c"
+    border_color = "#374151"
+    data_col_min_width = '110px'; index_col_party_type_width = '100px'
+    index_col_party_name_width = '120px'; index_col_week_range_literal_width = '90px'
+
+    styled_df = df_to_style.style.format(
+        lambda x: f"{x:,.0f}" if x != 0 else "-", na_rep="-"
+    ) \
+        .set_caption(f"<span style='font-size: 1.1em; font-weight:500; color: {text_color_light}; display:block; margin-bottom:8px; text-align:center;'>📋 Weekly Cashflow Breakdown</span>") \
+        .set_properties(**{
+            'font-size': '9pt', 'border': 'none',
+            'font-family': "'Inter', 'Segoe UI', sans-serif",
+            'color': text_color_light, 'width': 'auto',
+            'margin-left': 'auto', 'margin-right': 'auto'
+        }) \
+        .set_table_styles([
+            {'selector': '', 'props': [
+                ('border-collapse', 'collapse'), ('width', 'auto'),
+                ('min-width', '60%'), ('max-width', '95%')]},
+            {'selector': 'caption', 'props': [('caption-side', 'top')]},
+            {'selector': 'th', 'props': [
+                ('text-align', 'center'), ('vertical-align', 'middle'),
+                ('padding', '10px 8px'), ('border', f'1px solid {border_color}'),
+                ('font-weight', '500'), ('font-size', '9pt'),
+                ('color', text_color_light)
+            ]},
+            {'selector': 'th.col_heading', 'props': [
+                ('background-color', bg_header),
+                ('min-width', data_col_min_width), ('max-width', data_col_min_width)
+            ]},
+            {'selector': 'th.index_name', 'props': [
+                ('background-color', bg_header),
+                ('min-width', index_col_week_range_literal_width), ('max-width', index_col_week_range_literal_width)
+            ]},
+            {'selector': 'th.row_heading', 'props': [
+                ('background-color', bg_index_cols),
+                ('font-weight', 'normal'),
+            ]},
+            {'selector': 'td', 'props': [
+                ('background-color', bg_data_cells),
+                ('text-align', 'center'), ('vertical-align', 'middle'),
+                ('padding', '10px 8px'), ('border', f'1px solid {border_color}'),
+                ('min-width', data_col_min_width), ('max-width', data_col_min_width)
+            ]},
+            {'selector': 'th.row_heading.level0', 'props': [
+                ('font-weight', '500'), ('color', '#81a1c1'),
+                ('min-width', index_col_party_type_width), ('max-width', index_col_party_type_width)
+            ]},
+             {'selector': 'th.row_heading.level1', 'props': [
+                ('min-width', index_col_party_name_width), ('max-width', index_col_party_name_width)
+            ]},
+        ])
+
+    def color_zero_values(val):
+        return f'color: {text_color_faint}; text-align: center; vertical-align: middle;' if val == 0 or pd.isna(val) else f'color: {text_color_light}; text-align: center; vertical-align: middle;'
+    data_cols_to_style = [col for col in df_to_style.columns if df_to_style[col].dtype in ['int64', 'float64', np.number]]
+    if data_cols_to_style:
+        styled_df = styled_df.applymap(color_zero_values, subset=data_cols_to_style)
+
+    if numeric_cols:
+        valid_numeric_cols_for_subset = [col for col in numeric_cols if col in df_to_style.columns]
+        if valid_numeric_cols_for_subset:
+            try:
+                def subtle_gradient_for_dark(s):
+                    styles = [''] * len(s)
+                    max_abs_val = s.abs().max()
+                    if pd.isna(max_abs_val) or max_abs_val == 0: max_abs_val = 1
+                    for i, val in s.items():
+                        idx_loc = s.index.get_loc(i)
+                        if val > 0:
+                            opacity = min(0.3, 0.05 + (val / max_abs_val) * 0.25)
+                            styles[idx_loc] = f'background-color: rgba(16, 185, 129, {opacity})' # Emerald green tint
+                        elif val < 0:
+                            opacity = min(0.3, 0.05 + (abs(val) / max_abs_val) * 0.25)
+                            styles[idx_loc] = f'background-color: rgba(239, 68, 68, {opacity})' # Red tint
+                    return styles
+                styled_df = styled_df.apply(subtle_gradient_for_dark, subset=valid_numeric_cols_for_subset, axis=0)
+            except Exception as e: st.warning(f"Could not apply custom background gradient: {e}.")
+
+    def style_net_cashflow_row(row):
+        if row.name == ("Net Cashflow", ""):
+            return [f'font-weight: 500; background-color: {bg_net_cashflow}; color: {text_color_light}; border: 1px solid {border_color}; font-size:10pt; text-align:center; vertical-align:middle;'] * len(row)
+        return [''] * len(row)
+    styled_df = styled_df.apply(style_net_cashflow_row, axis=1)
+    return styled_df
+
+# --- Sidebar for Inputs ---
+with st.sidebar:
+    st.markdown("<h1>Inputs & Settings</h1>", unsafe_allow_html=True)
+    st.markdown("---")
+    with st.expander("📥 Download Sample Template", expanded=False):
+        sample_data = pd.DataFrame({
+            "Party Type": ["Supplier", "Customer", "Supplier"],
+            "Party Name": ["ABC Ltd", "XYZ Inc", "DEF Supplies"],
+            "Due Date": ["2024-07-15", "2024-07-10", "2024-07-20"],
+            "Expected Date": ["2024-07-20", "2024-07-14", "2024-07-22"],
+            "Amount": [-10000, 12000, -5000]
+        })
+        sample_data["Due Date"] = pd.to_datetime(sample_data["Due Date"]).dt.strftime('%Y-%m-%d')
+        sample_data["Expected Date"] = pd.to_datetime(sample_data["Expected Date"]).dt.strftime('%Y-%m-%d')
+        st.download_button(
+            label="Download Template CSV", data=sample_data.to_csv(index=False).encode('utf-8'),
+            file_name="cashflow_template.csv", mime="text/csv",
+            help="Use this template to structure your cashflow data."
+        )
+    st.markdown("---")
+    uploaded_file = st.file_uploader(
+        "Upload Cashflow Data (CSV or Excel)", type=["csv", "xlsx"],
+        help="Upload your CSV or Excel file with cashflow entries."
+    )
+    st.markdown("---")
+    st.caption("Developed with ❤️")
+
 # --- Main Panel for Results ---
 if uploaded_file:
     with st.spinner("🚀 Processing your file... Hold tight!"):
         try:
-            # ... (File loading, validation, data processing logic - SAME AS PREVIOUS) ...
+            # --- 3. File Load and Normalization ---
             if uploaded_file.name.endswith(".csv"): df = pd.read_csv(uploaded_file)
             elif uploaded_file.name.endswith(".xlsx"): df = pd.read_excel(uploaded_file, sheet_name=0, engine='openpyxl')
             else: st.error("Unsupported file type."); st.stop()
             st.success(f"File `{uploaded_file.name}` loaded successfully!")
             df.columns = df.columns.str.replace('\ufeff', '', regex=False).str.strip().str.lower()
+
+            # --- 4. Validate Required Columns ---
             required_cols = {"party type", "party name", "due date", "expected date", "amount"}
             missing_cols = required_cols - set(df.columns)
             if missing_cols: st.error(f"Missing required columns: {', '.join(missing_cols)}."); st.stop()
+
+            # --- 5. Data Type Conversion and Validation ---
             df['amount'] = pd.to_numeric(df['amount'], errors='coerce')
             if df['amount'].isnull().any(): st.warning("Some 'Amount' values were non-numeric and ignored.")
             for col in ["due date", "expected date"]:
@@ -20,6 +317,8 @@ if uploaded_file:
             df.dropna(subset=['amount', 'due date', 'expected date'], inplace=True)
             if len(df) < initial_row_count: st.info(f"{initial_row_count - len(df)} rows removed due to missing/invalid critical values.")
             if df.empty: st.error("No valid data remaining after processing."); st.stop()
+
+            # --- 6. Allocation + Week Logic ---
             df["allocation date"] = df[["due date", "expected date"]].max(axis=1)
             df["week_start"] = df["allocation date"].dt.to_period("W").apply(lambda r: r.start_time)
             df["week_range"] = df["week_start"].apply(format_week_range)
@@ -28,7 +327,7 @@ if uploaded_file:
             st.success(f"Data validated: {df.shape[0]} rows ready for forecasting.")
             st.divider()
 
-            # --- Key Metrics Section (SAME AS PREVIOUS) ---
+            # --- Key Metrics Section ---
             st.subheader("🚀 At a Glance: Forecast Summary")
             total_inflow = df[df['amount'] > 0]['amount'].sum()
             total_outflow_val = df[df['amount'] < 0]['amount'].sum()
@@ -55,13 +354,13 @@ if uploaded_file:
             cols2[2].metric(label="No. of Forecast Weeks", value=str(num_forecast_weeks), help="Total weeks covered.")
             st.divider()
 
-            # --- Data Preview (SAME AS PREVIOUS) ---
+            # --- Data Preview ---
             with st.container():
                 st.subheader("📄 Uploaded Data Preview (First 5 Valid Rows)")
                 st.dataframe(df.head(), use_container_width=True, hide_index=True)
             st.divider()
 
-            # --- Prepare Pivot Table Data (SAME AS PREVIOUS) ---
+            # --- Prepare Pivot Table Data ---
             all_parties = df[["party type", "party name"]].drop_duplicates()
             all_weeks_df = pd.DataFrame({"week_range": all_week_ranges_sorted})
             if not all_parties.empty and not all_weeks_df.empty:
@@ -69,25 +368,26 @@ if uploaded_file:
                 grouped = df.groupby(["party type", "party name", "week_range"], as_index=False)["amount"].sum()
                 complete_df = pd.merge(all_cross, grouped, on=["party type", "party name", "week_range"], how="left").fillna(0)
             else: complete_df = pd.DataFrame(columns=["party type", "party name", "week_range", "amount"])
+            
+            final_table = pd.DataFrame(columns=["No Data"]) # Initialize
+            net_cashflow_series = pd.Series(dtype='float64') # Initialize
+
             if not complete_df.empty:
                 complete_df['week_range'] = pd.Categorical(complete_df['week_range'], categories=all_week_ranges_sorted, ordered=True)
                 pivot_table = complete_df.pivot_table(index=["party type", "party name"], columns="week_range", values="amount", aggfunc="sum", fill_value=0, dropna=False)
-            else: pivot_table = pd.DataFrame()
-            if not pivot_table.empty:
-                net_cashflow_series = pivot_table.sum(numeric_only=True) # Used for chart conditional rendering
-                net_row = pd.DataFrame([net_cashflow_series], index=pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
-                final_table = pd.concat([pivot_table, net_row])
-            else: 
-                final_table = pd.DataFrame(columns=["No Data"])
-                net_cashflow_series = pd.Series(dtype='float64') # Ensure it exists as empty for checks
+                if not pivot_table.empty:
+                    net_cashflow_series = pivot_table.sum(numeric_only=True)
+                    net_row = pd.DataFrame([net_cashflow_series], index=pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
+                    final_table = pd.concat([pivot_table, net_row])
+            
 
-            # --- Main Forecast Display Area (WITH CONDITIONAL CHART RENDERING) ---
+            # --- Main Forecast Display Area ---
             with st.container():
                 st.subheader("📊 Detailed Weekly Cashflow Forecast")
                 if not final_table.empty and "No Data" not in final_table.columns:
                     st.markdown(style_table(final_table).to_html(), unsafe_allow_html=True)
-                    # No <br> here
 
+                    # Altair chart configuration for dark theme
                     chart_bg_color = '#121212'; view_bg_color = '#121212'
                     chart_text_color = '#9ca3af'; grid_color = '#374151'
                     positive_color = '#10b981'; negative_color = '#ef4444'
@@ -96,7 +396,7 @@ if uploaded_file:
                     if not net_cashflow_series.empty:
                         net_df = net_cashflow_series.reset_index()
                         net_df.columns = ["Week Range", "Net Cashflow"]
-                        if not net_df.empty: # Further check if DataFrame is not empty
+                        if not net_df.empty and not net_df["Net Cashflow"].isnull().all(): # Ensure there's actual data to plot
                             net_df["Week Range"] = pd.Categorical(net_df["Week Range"], categories=all_week_ranges_sorted, ordered=True)
                             net_df = net_df.sort_values("Week Range")
                             
@@ -111,16 +411,14 @@ if uploaded_file:
                             text_labels = bars.mark_text(align="center", baseline="middle", dy=alt.expr("datum['Net Cashflow'] >= 0 ? -8 : 8"), fontSize=8, fontWeight=400).encode(
                                 text=alt.Text("Net Cashflow:Q", format=",.0f"), color=alt.value(bar_label_color))
                             chart = (bars + text_labels).properties(height=300, background=chart_bg_color).configure_view(
-                                strokeOpacity=0, fill=view_bg_color ).configure_axis( gridColor=grid_color, gridOpacity=0.2 ) # or grid=False
+                                strokeOpacity=0, fill=view_bg_color ).configure_axis( gridColor=grid_color, gridOpacity=0.2 )
                             st.altair_chart(chart, use_container_width=True)
-                        # else: # Optionally, if net_df became empty after reset (unlikely if net_cashflow_series wasn't empty)
-                        #    st.caption("No data points for Net Cashflow chart after processing.")
-                    # else: # If net_cashflow_series itself was empty
-                    #    st.caption("No data available for Net Cashflow chart.")
+                        # else: st.caption("No data points for Net Cashflow chart after processing.") # Optional
+                    # else: st.caption("No data available for Net Cashflow chart.") # Optional
                     
                     st.divider()
                     st.subheader(" summarized Totals by Party Type")
-                    if not df.empty: # Original df for summary
+                    if not df.empty:
                         summary_by_type = df.groupby("party type")["amount"].sum().reset_index()
                         summary_by_type.columns = ["Party Type", "Total Amount"]
                         customers_total = summary_by_type[summary_by_type["Party Type"].str.lower().str.contains("customer", case=False)]["Total Amount"].sum()
@@ -142,24 +440,21 @@ if uploaded_file:
                         
                         if chart_summary_data:
                             summary_chart_df = pd.DataFrame(chart_summary_data)
-                            if not summary_chart_df.empty:
+                            if not summary_chart_df.empty and not summary_chart_df["Amount"].isnull().all(): # Ensure data to plot
                                 summary_bars = alt.Chart(summary_chart_df).mark_bar(size=30).encode(
                                     x=alt.X('Amount:Q', title='Total Amount ($)', axis=alt.Axis(labelFontSize=9, titleFontSize=10, titleColor=chart_text_color, labelColor=chart_text_color, domainColor=grid_color, tickColor=grid_color, gridColor=grid_color, format="~s")),
                                     y=alt.Y('Party Type:N', sort='-x', title='Party Type', axis=alt.Axis(labelFontSize=9, titleFontSize=10, titleColor=chart_text_color, labelColor=chart_text_color, domainColor=grid_color, tickColor=grid_color)),
                                     color=alt.condition(alt.datum.Amount >= 0, alt.value(positive_color), alt.value(negative_color)),
                                     tooltip=['Party Type', alt.Tooltip('Amount:Q', format=',.0f')]
                                 ).properties(title=alt.TitleParams(text="📊 Summary by Party Type", anchor='middle', fontSize=14, fontWeight=500, color=text_color_light_for_title, dy=-5),
-                                             height=alt.Step(40), background=chart_bg_color ).configure_view(strokeOpacity=0, fill=view_bg_color).configure_axis(gridColor=grid_color, gridOpacity=0.2) # or grid=False
+                                             height=alt.Step(40), background=chart_bg_color ).configure_view(strokeOpacity=0, fill=view_bg_color).configure_axis(gridColor=grid_color, gridOpacity=0.2)
                                 st.altair_chart(summary_bars, use_container_width=True)
-                            # else: # Optionally handle if summary_chart_df is empty
-                            #    st.caption("No data points for Party Type Summary chart after processing.")
-                        # else: # If chart_summary_data list was empty
-                        #    st.caption("No data available for Party Type Summary chart.")
+                            # else: st.caption("No data points for Party Type Summary chart after processing.") # Optional
+                        # else: st.caption("No data available for Party Type Summary chart.") # Optional
                     else: st.info("No base data for Client/Supplier summary.")
 
                     st.divider()
                     st.subheader("📤 Export Forecast")
-                    # ... (Export logic - SAME AS PREVIOUS) ...
                     towrite = BytesIO()
                     export_table = final_table.copy()
                     if isinstance(export_table.index, pd.MultiIndex): export_table = export_table.reset_index()
@@ -176,17 +471,15 @@ if uploaded_file:
                                  worksheet.set_column(col_idx, col_idx, None, money_format)
                     st.download_button(label="Download Forecast as Excel", data=towrite.getvalue(), file_name="cashflow_forecast.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                 else: st.info("ℹ️ No forecast table to display.")
-        # ... (Exception handling - SAME AS PREVIOUS) ...
         except pd.errors.ParserError: st.error("❌ Error parsing the uploaded file.")
         except ImportError as ie:
             if "matplotlib" in str(ie).lower(): st.error("❌ Matplotlib is missing. Install with `pip install matplotlib`.")
             else: st.error(f"Import error: {ie}.")
             st.exception(ie)
         except Exception as e:
-            st.error(f"An unexpected error occurred during processing.")
-            st.exception(e)
+            st.error(f"An unexpected error occurred during processing: {e}") # Include error message
+            st.exception(e) # Show full traceback for debugging
 else:
-    # ... (Welcome message - SAME AS PREVIOUS) ...
     st.info("👈 **Upload your cashflow file using the sidebar to get started!**")
     st.markdown("---")
     with st.expander("💡 How to Use This Dashboard", expanded=True):
