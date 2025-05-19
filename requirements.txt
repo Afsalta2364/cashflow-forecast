@@ -3,4 +3,5 @@ pandas
 altair
 openpyxl
 xlsxwriter
-matplotlib
+matplotlib 
+numpy 
