@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from io import BytesIO
-import matplotlib # For background_gradient (though custom function is used now)
+import matplotlib # For potential underlying pandas styler functionalities or future use
 import numpy as np
 
 # --- Page Setup ---
@@ -187,94 +187,126 @@ def format_week_range(start_date):
     return f"{start_date.day} {start_date.strftime('%b')} - {end_date.day} {end_date.strftime('%b')}"
 
 def style_table(df_to_style):
-    numeric_cols = df_to_style.select_dtypes(include='number').columns.tolist()
+    numeric_cols = df_to_style.select_dtypes(include=np.number).columns.tolist()
     text_color_light = "#d1d5db"; text_color_faint = "#6b7280"
     bg_header = "#1f2937"; bg_index_cols = "#111827"
-    bg_data_cells = "#1f2937"; bg_net_cashflow = "#2b394c"
+    bg_data_cells_default = "#1f2937"; bg_net_cashflow = "#2b394c" # Default, gradient will override
     border_color = "#374151"
     data_col_min_width = '110px'; index_col_party_type_width = '100px'
     index_col_party_name_width = '120px'; index_col_week_range_literal_width = '90px'
 
-    styled_df = df_to_style.style.format(
-        lambda x: f"{x:,.0f}" if x != 0 else "-", na_rep="-"
-    ) \
-        .set_caption(f"<span style='font-size: 1.1em; font-weight:500; color: {text_color_light}; display:block; margin-bottom:8px; text-align:center;'>📋 Weekly Cashflow Breakdown</span>") \
+    styled_df = df_to_style.style # Initialize Styler object
+
+    # 1. Set caption, global properties, and table structure styles
+    styled_df = styled_df.set_caption(f"<span style='font-size: 1.1em; font-weight:500; color: {text_color_light}; display:block; margin-bottom:8px; text-align:center;'>📋 Weekly Cashflow Breakdown</span>") \
         .set_properties(**{
             'font-size': '9pt', 'border': 'none',
             'font-family': "'Inter', 'Segoe UI', sans-serif",
-            'color': text_color_light, 'width': 'auto',
-            'margin-left': 'auto', 'margin-right': 'auto'
+            'color': text_color_light, 'width': 'auto', # Default text color
+            'margin-left': 'auto', 'margin-right': 'auto',
+            'background-color': bg_data_cells_default # Default background for data cells
         }) \
         .set_table_styles([
             {'selector': '', 'props': [
                 ('border-collapse', 'collapse'), ('width', 'auto'),
                 ('min-width', '60%'), ('max-width', '95%')]},
             {'selector': 'caption', 'props': [('caption-side', 'top')]},
-            {'selector': 'th', 'props': [
+            {'selector': 'th', 'props': [ # General header cells
                 ('text-align', 'center'), ('vertical-align', 'middle'),
                 ('padding', '10px 8px'), ('border', f'1px solid {border_color}'),
                 ('font-weight', '500'), ('font-size', '9pt'),
                 ('color', text_color_light)
             ]},
-            {'selector': 'th.col_heading', 'props': [
+            {'selector': 'th.col_heading', 'props': [ # Column headers (week ranges)
                 ('background-color', bg_header),
                 ('min-width', data_col_min_width), ('max-width', data_col_min_width)
             ]},
-            {'selector': 'th.index_name', 'props': [
+            {'selector': 'th.index_name', 'props': [ # Index names (e.g., "Party Type", "Party Name")
                 ('background-color', bg_header),
+                 # Adjusted width for index names if they exist and are displayed
                 ('min-width', index_col_week_range_literal_width), ('max-width', index_col_week_range_literal_width)
             ]},
-            {'selector': 'th.row_heading', 'props': [
+            {'selector': 'th.row_heading', 'props': [ # Row index cells
                 ('background-color', bg_index_cols),
                 ('font-weight', 'normal'),
+                ('text-align', 'left'), ('padding-left', '10px') # Align index text left
             ]},
-            {'selector': 'td', 'props': [
-                ('background-color', bg_data_cells),
+            {'selector': 'td', 'props': [ # Data cells
+                # background-color set by set_properties or by apply functions
                 ('text-align', 'center'), ('vertical-align', 'middle'),
                 ('padding', '10px 8px'), ('border', f'1px solid {border_color}'),
                 ('min-width', data_col_min_width), ('max-width', data_col_min_width)
             ]},
-            {'selector': 'th.row_heading.level0', 'props': [
-                ('font-weight', '500'), ('color', '#81a1c1'),
+            {'selector': 'th.row_heading.level0', 'props': [ # First level of MultiIndex rows
+                ('font-weight', '500'), ('color', '#81a1c1'), # Brighter color for party type
                 ('min-width', index_col_party_type_width), ('max-width', index_col_party_type_width)
             ]},
-             {'selector': 'th.row_heading.level1', 'props': [
+             {'selector': 'th.row_heading.level1', 'props': [ # Second level of MultiIndex rows
                 ('min-width', index_col_party_name_width), ('max-width', index_col_party_name_width)
             ]},
         ])
 
-    def color_zero_values(val):
-        return f'color: {text_color_faint}; text-align: center; vertical-align: middle;' if val == 0 or pd.isna(val) else f'color: {text_color_light}; text-align: center; vertical-align: middle;'
-    data_cols_to_style = [col for col in df_to_style.columns if df_to_style[col].dtype in ['int64', 'float64', np.number]]
-    if data_cols_to_style:
-        styled_df = styled_df.applymap(color_zero_values, subset=data_cols_to_style)
+    # 2. Apply text color styling based on original values (element-wise for numeric columns)
+    def color_text_conditionally(val):
+        # This function receives the original unformatted numeric value
+        style = 'text-align: center; vertical-align: middle;'
+        if pd.isna(val) or val == 0:
+            return f'color: {text_color_faint}; {style}'
+        return f'color: {text_color_light}; {style}' # Default text color for non-zero
 
     if numeric_cols:
-        valid_numeric_cols_for_subset = [col for col in numeric_cols if col in df_to_style.columns]
-        if valid_numeric_cols_for_subset:
-            try:
-                def subtle_gradient_for_dark(s):
-                    styles = [''] * len(s)
-                    max_abs_val = s.abs().max()
-                    if pd.isna(max_abs_val) or max_abs_val == 0: max_abs_val = 1
-                    for i, val in s.items():
-                        idx_loc = s.index.get_loc(i)
-                        if val > 0:
-                            opacity = min(0.3, 0.05 + (val / max_abs_val) * 0.25)
-                            styles[idx_loc] = f'background-color: rgba(16, 185, 129, {opacity})' # Emerald green tint
-                        elif val < 0:
-                            opacity = min(0.3, 0.05 + (abs(val) / max_abs_val) * 0.25)
-                            styles[idx_loc] = f'background-color: rgba(239, 68, 68, {opacity})' # Red tint
-                    return styles
-                styled_df = styled_df.apply(subtle_gradient_for_dark, subset=valid_numeric_cols_for_subset, axis=0)
-            except Exception as e: st.warning(f"Could not apply custom background gradient: {e}.")
+        styled_df = styled_df.applymap(color_text_conditionally, subset=numeric_cols)
 
-    def style_net_cashflow_row(row):
-        if row.name == ("Net Cashflow", ""):
-            return [f'font-weight: 500; background-color: {bg_net_cashflow}; color: {text_color_light}; border: 1px solid {border_color}; font-size:10pt; text-align:center; vertical-align:middle;'] * len(row)
-        return [''] * len(row)
+    # 3. Apply background gradient (column-wise for numeric columns)
+    if numeric_cols:
+        try:
+            def subtle_gradient_for_dark(s_col): # s_col is a Series of original data for a column
+                styles = [''] * len(s_col)
+                # Ensure s_col is numeric for calculations, coerce errors to NaN
+                s_numeric = pd.to_numeric(s_col, errors='coerce')
+                max_abs_val = s_numeric.abs().max()
+                if pd.isna(max_abs_val) or max_abs_val == 0: max_abs_val = 1 # Avoid division by zero
+
+                for i, original_val in s_col.items(): # Iterate using original Series to keep original index
+                    idx_loc = s_col.index.get_loc(i) # Positional index for styles list
+                    numeric_val = s_numeric.loc[i] # Get corresponding numeric value
+
+                    if pd.notna(numeric_val): # Only apply gradient to actual numbers
+                        if numeric_val > 0:
+                            opacity = min(0.3, 0.05 + (numeric_val / max_abs_val) * 0.25)
+                            styles[idx_loc] = f'background-color: rgba(16, 185, 129, {opacity})' # Emerald green tint
+                        elif numeric_val < 0:
+                            opacity = min(0.3, 0.05 + (abs(numeric_val) / max_abs_val) * 0.25)
+                            styles[idx_loc] = f'background-color: rgba(239, 68, 68, {opacity})' # Red tint
+                        # else: numeric_val == 0, no specific background from gradient. Text color handled by color_text_conditionally.
+                return styles
+            styled_df = styled_df.apply(subtle_gradient_for_dark, subset=numeric_cols, axis=0)
+        except Exception as e: st.warning(f"Could not apply custom background gradient: {e}.")
+
+    # 4. Style specific rows (e.g., Net Cashflow summary row)
+    # This is applied after general cell styling, so it can override if needed.
+    def style_net_cashflow_row(row_series): # row_series contains original data for a row
+        if row_series.name == ("Net Cashflow", ""): # Check MultiIndex name
+            # Apply to all cells in this row
+            return [f'font-weight: 500; background-color: {bg_net_cashflow} !important; color: {text_color_light} !important; border: 1px solid {border_color}; font-size:10pt; text-align:center; vertical-align:middle;'] * len(row_series)
+        return [''] * len(row_series) # No special styling for other rows
     styled_df = styled_df.apply(style_net_cashflow_row, axis=1)
+
+    # 5. Apply final string formatting for display
+    # This formatter is applied to numeric columns.
+    def numeric_cell_formatter(val):
+        if pd.isna(val):
+            return "-" # Display for NaN
+        if val == 0:
+            return "-" # Display for zero
+        return f"{val:,.0f}" # Standard formatting for other numbers
+
+    formatters = {col: numeric_cell_formatter for col in numeric_cols}
+    # na_rep handles NaNs in any columns not covered by 'formatters' (e.g., non-numeric columns)
+    styled_df = styled_df.format(formatters, na_rep="-")
+
     return styled_df
+
 
 # --- Sidebar for Inputs ---
 with st.sidebar:
@@ -351,8 +383,8 @@ if uploaded_file:
             cols1[0].metric(label="Total Inflow", value=f"{total_inflow:,.0f}", help="Sum of all positive cashflow amounts.")
             cols1[1].metric(label="Total Outflow", value=f"{total_outflow_val:,.0f}", help="Sum of all negative cashflow amounts.")
             delta_for_net, delta_color_for_net, help_text_net = None, "off", "Overall net change."
-            if abs(total_outflow_val) > 0:
-                net_perc_of_outflow = (net_overall_cashflow / abs(total_outflow_val)) * 100 if abs(total_outflow_val) != 0 else 0
+            if abs(total_outflow_val) > 0: # Check if total_outflow_val is not zero to avoid division by zero
+                net_perc_of_outflow = (net_overall_cashflow / abs(total_outflow_val)) * 100
                 delta_for_net = f"{net_perc_of_outflow:.1f}% vs Outflow Mag."
                 delta_color_for_net = "normal" if net_overall_cashflow >= 0 else "inverse"
                 help_text_net += f" Net ({net_overall_cashflow:,.0f}) is {net_perc_of_outflow:.1f}% of outflow ({abs(total_outflow_val):,.0f})."
@@ -373,26 +405,53 @@ if uploaded_file:
             st.divider()
 
             # --- Prepare Pivot Table Data ---
-            all_parties = df[["party type", "party name"]].drop_duplicates()
-            all_weeks_df = pd.DataFrame({"week_range": all_week_ranges_sorted})
-            if not all_parties.empty and not all_weeks_df.empty:
-                all_cross = pd.merge(all_parties, all_weeks_df, how="cross")
-                grouped = df.groupby(["party type", "party name", "week_range"], as_index=False)["amount"].sum()
-                complete_df = pd.merge(all_cross, grouped, on=["party type", "party name", "week_range"], how="left").fillna(0)
-            else: complete_df = pd.DataFrame(columns=["party type", "party name", "week_range", "amount"])
+            all_parties = df[["party type", "party name"]].drop_duplicates().sort_values(by=["party type", "party name"]) # Sort for consistent order
+            all_weeks_df = pd.DataFrame({"week_range": all_week_ranges_sorted}) # Already sorted
             
-            final_table = pd.DataFrame(columns=["No Data"])
+            final_table = pd.DataFrame(columns=["No Data"]) # Default if no data
             net_cashflow_series = pd.Series(dtype='float64')
 
-            if not complete_df.empty:
-                complete_df['week_range'] = pd.Categorical(complete_df['week_range'], categories=all_week_ranges_sorted, ordered=True)
-                pivot_table = complete_df.pivot_table(index=["party type", "party name"], columns="week_range", values="amount", aggfunc="sum", fill_value=0, dropna=False)
-                if not pivot_table.empty:
-                    net_cashflow_series = pivot_table.sum(numeric_only=True)
-                    net_row = pd.DataFrame([net_cashflow_series], index=pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
-                    final_table = pd.concat([pivot_table, net_row])
-            
+            if not all_parties.empty and not all_weeks_df.empty:
+                # Create a Cartesian product of all parties and all week ranges
+                # This ensures all parties appear for all weeks in the pivot table structure
+                all_cross = pd.merge(all_parties, all_weeks_df, how="cross")
+                
+                # Group actual data
+                grouped = df.groupby(["party type", "party name", "week_range"], as_index=False)["amount"].sum()
+                
+                # Merge to get a complete DataFrame with all party/week combinations, filling missing amounts with 0
+                complete_df = pd.merge(all_cross, grouped, on=["party type", "party name", "week_range"], how="left").fillna(0)
+            elif not df.empty: # Handle cases where there's data but maybe only one party or one week
+                 grouped = df.groupby(["party type", "party name", "week_range"], as_index=False)["amount"].sum()
+                 complete_df = grouped # Use grouped directly
+            else: # No data to process
+                complete_df = pd.DataFrame(columns=["party type", "party name", "week_range", "amount"])
 
+            if not complete_df.empty:
+                # Ensure week_range is categorical and sorted correctly for pivot_table columns
+                complete_df['week_range'] = pd.Categorical(complete_df['week_range'], categories=all_week_ranges_sorted, ordered=True)
+                
+                pivot_table = complete_df.pivot_table(
+                    index=["party type", "party name"],
+                    columns="week_range",
+                    values="amount",
+                    aggfunc="sum",  # Summing already summed group, effectively 'first' if groups are unique
+                    fill_value=0,
+                    dropna=False # Keep all combinations from index/columns
+                )
+                
+                if not pivot_table.empty:
+                    # Calculate net cashflow per week
+                    net_cashflow_series = pivot_table.sum(numeric_only=True) # Sums each column (week)
+                    
+                    # Create a DataFrame for the "Net Cashflow" summary row
+                    # Using a MultiIndex to match the pivot_table's index structure
+                    net_row_df = pd.DataFrame([net_cashflow_series], index=pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
+                    net_row_df.columns = pivot_table.columns # Ensure columns match for concat
+
+                    # Append the net cashflow row to the pivot table
+                    final_table = pd.concat([pivot_table, net_row_df])
+            
             # --- Main Forecast Display Area ---
             with st.container():
                 st.subheader("📊 Detailed Weekly Cashflow Forecast")
@@ -423,10 +482,10 @@ if uploaded_file:
                                 text=alt.Text("Net Cashflow:Q", format=",.0f"), color=alt.value(bar_label_color))
                             chart = (bars + text_labels).properties(height=300, background=chart_bg_color).configure_view(
                                 strokeOpacity=0, fill=view_bg_color ).configure_axis( gridColor=grid_color, gridOpacity=0.2 )
-                            st.altair_chart(chart, use_container_width=True) # Chart actions menu will appear by default
+                            st.altair_chart(chart, use_container_width=True)
                     
                     st.divider()
-                    st.subheader(" summarized Totals by Party Type")
+                    st.subheader(" summarized Totals by Party Type") # Corrected: "Summarized Totals..."
                     if not df.empty:
                         summary_by_type = df.groupby("party type")["amount"].sum().reset_index()
                         summary_by_type.columns = ["Party Type", "Total Amount"]
@@ -457,7 +516,7 @@ if uploaded_file:
                                     tooltip=['Party Type', alt.Tooltip('Amount:Q', format=',.0f')]
                                 ).properties(title=alt.TitleParams(text="📊 Summary by Party Type", anchor='middle', fontSize=14, fontWeight=500, color=text_color_light_for_title, dy=-5),
                                              height=alt.Step(40), background=chart_bg_color ).configure_view(strokeOpacity=0, fill=view_bg_color).configure_axis(gridColor=grid_color, gridOpacity=0.2)
-                                st.altair_chart(summary_bars, use_container_width=True) # Chart actions menu will appear by default
+                                st.altair_chart(summary_bars, use_container_width=True)
                     else: st.info("No base data for Client/Supplier summary.")
 
                     st.divider()
@@ -467,21 +526,25 @@ if uploaded_file:
                     if isinstance(export_table.index, pd.MultiIndex): export_table = export_table.reset_index()
                     with pd.ExcelWriter(towrite, engine="xlsxwriter") as writer:
                         export_table.to_excel(writer, sheet_name="Cashflow Forecast", index=False)
-                        workbook, worksheet = writer.book, writer.sheets["Cashflow Forecast"]
+                        workbook  = writer.book
+                        worksheet = writer.sheets["Cashflow Forecast"]
                         header_format = workbook.add_format({'bold': True, 'text_wrap': True, 'valign': 'top', 'fg_color': '#4F81BD', 'font_color': '#FFFFFF', 'border': 1})
                         for col_num, value in enumerate(export_table.columns.values): worksheet.write(0, col_num, value, header_format)
-                        worksheet.set_column(0, len(export_table.columns) -1 , 18)
+                        worksheet.set_column(0, len(export_table.columns) -1 , 18) # Default column width
                         money_format = workbook.add_format({'num_format': '#,##0'})
+                        # Apply money format to numeric columns, skipping index columns if they were reset
+                        # Assuming index columns are named 'party type', 'party name' after reset_index()
                         for col_idx, col_name in enumerate(export_table.columns):
                             is_party_col = col_name.lower() in ["party type", "party name"]
-                            if not is_party_col and (export_table[col_name].dtype in ['int64', 'float64', np.number]):
-                                 worksheet.set_column(col_idx, col_idx, None, money_format)
+                            # Check if column contains numeric data (simple check, might need refinement for mixed types)
+                            if not is_party_col and pd.api.types.is_numeric_dtype(export_table[col_name]):
+                                 worksheet.set_column(col_idx, col_idx, None, money_format) # Apply to the whole column
                     st.download_button(label="Download Forecast as Excel", data=towrite.getvalue(), file_name="cashflow_forecast.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-                else: st.info("ℹ️ No forecast table to display.")
-        except pd.errors.ParserError: st.error("❌ Error parsing the uploaded file.")
+                else: st.info("ℹ️ No forecast table to display. This might happen if the uploaded data is empty or lacks valid entries after processing.")
+        except pd.errors.ParserError: st.error("❌ Error parsing the uploaded file. Please ensure it's a valid CSV or Excel file.")
         except ImportError as ie:
-            if "matplotlib" in str(ie).lower(): st.error("❌ Matplotlib is missing. Install with `pip install matplotlib`.")
-            else: st.error(f"Import error: {ie}.")
+            if "matplotlib" in str(ie).lower(): st.error("❌ A required plotting library (Matplotlib) is missing. Please install it (`pip install matplotlib`) if it's needed by underlying pandas functions.")
+            else: st.error(f"An import error occurred: {ie}.")
             st.exception(ie)
         except Exception as e:
             st.error(f"An unexpected error occurred during processing: {e}")
