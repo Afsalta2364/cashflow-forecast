@@ -369,8 +369,8 @@ if uploaded_file:
                 complete_df = pd.merge(all_cross, grouped, on=["party type", "party name", "week_range"], how="left").fillna(0)
             else: complete_df = pd.DataFrame(columns=["party type", "party name", "week_range", "amount"])
             
-            final_table = pd.DataFrame(columns=["No Data"]) # Initialize
-            net_cashflow_series = pd.Series(dtype='float64') # Initialize
+            final_table = pd.DataFrame(columns=["No Data"])
+            net_cashflow_series = pd.Series(dtype='float64')
 
             if not complete_df.empty:
                 complete_df['week_range'] = pd.Categorical(complete_df['week_range'], categories=all_week_ranges_sorted, ordered=True)
@@ -387,7 +387,6 @@ if uploaded_file:
                 if not final_table.empty and "No Data" not in final_table.columns:
                     st.markdown(style_table(final_table).to_html(), unsafe_allow_html=True)
 
-                    # Altair chart configuration for dark theme
                     chart_bg_color = '#121212'; view_bg_color = '#121212'
                     chart_text_color = '#9ca3af'; grid_color = '#374151'
                     positive_color = '#10b981'; negative_color = '#ef4444'
@@ -396,7 +395,7 @@ if uploaded_file:
                     if not net_cashflow_series.empty:
                         net_df = net_cashflow_series.reset_index()
                         net_df.columns = ["Week Range", "Net Cashflow"]
-                        if not net_df.empty and not net_df["Net Cashflow"].isnull().all(): # Ensure there's actual data to plot
+                        if not net_df.empty and not net_df["Net Cashflow"].isnull().all():
                             net_df["Week Range"] = pd.Categorical(net_df["Week Range"], categories=all_week_ranges_sorted, ordered=True)
                             net_df = net_df.sort_values("Week Range")
                             
@@ -412,9 +411,7 @@ if uploaded_file:
                                 text=alt.Text("Net Cashflow:Q", format=",.0f"), color=alt.value(bar_label_color))
                             chart = (bars + text_labels).properties(height=300, background=chart_bg_color).configure_view(
                                 strokeOpacity=0, fill=view_bg_color ).configure_axis( gridColor=grid_color, gridOpacity=0.2 )
-                            st.altair_chart(chart, use_container_width=True)
-                        # else: st.caption("No data points for Net Cashflow chart after processing.") # Optional
-                    # else: st.caption("No data available for Net Cashflow chart.") # Optional
+                            st.altair_chart(chart.configure(actions=False), use_container_width=True) # REMOVED CHART ACTIONS
                     
                     st.divider()
                     st.subheader(" summarized Totals by Party Type")
@@ -440,7 +437,7 @@ if uploaded_file:
                         
                         if chart_summary_data:
                             summary_chart_df = pd.DataFrame(chart_summary_data)
-                            if not summary_chart_df.empty and not summary_chart_df["Amount"].isnull().all(): # Ensure data to plot
+                            if not summary_chart_df.empty and not summary_chart_df["Amount"].isnull().all():
                                 summary_bars = alt.Chart(summary_chart_df).mark_bar(size=30).encode(
                                     x=alt.X('Amount:Q', title='Total Amount ($)', axis=alt.Axis(labelFontSize=9, titleFontSize=10, titleColor=chart_text_color, labelColor=chart_text_color, domainColor=grid_color, tickColor=grid_color, gridColor=grid_color, format="~s")),
                                     y=alt.Y('Party Type:N', sort='-x', title='Party Type', axis=alt.Axis(labelFontSize=9, titleFontSize=10, titleColor=chart_text_color, labelColor=chart_text_color, domainColor=grid_color, tickColor=grid_color)),
@@ -448,9 +445,7 @@ if uploaded_file:
                                     tooltip=['Party Type', alt.Tooltip('Amount:Q', format=',.0f')]
                                 ).properties(title=alt.TitleParams(text="📊 Summary by Party Type", anchor='middle', fontSize=14, fontWeight=500, color=text_color_light_for_title, dy=-5),
                                              height=alt.Step(40), background=chart_bg_color ).configure_view(strokeOpacity=0, fill=view_bg_color).configure_axis(gridColor=grid_color, gridOpacity=0.2)
-                                st.altair_chart(summary_bars, use_container_width=True)
-                            # else: st.caption("No data points for Party Type Summary chart after processing.") # Optional
-                        # else: st.caption("No data available for Party Type Summary chart.") # Optional
+                                st.altair_chart(summary_bars.configure(actions=False), use_container_width=True) # REMOVED CHART ACTIONS
                     else: st.info("No base data for Client/Supplier summary.")
 
                     st.divider()
@@ -477,8 +472,8 @@ if uploaded_file:
             else: st.error(f"Import error: {ie}.")
             st.exception(ie)
         except Exception as e:
-            st.error(f"An unexpected error occurred during processing: {e}") # Include error message
-            st.exception(e) # Show full traceback for debugging
+            st.error(f"An unexpected error occurred during processing: {e}")
+            st.exception(e)
 else:
     st.info("👈 **Upload your cashflow file using the sidebar to get started!**")
     st.markdown("---")
