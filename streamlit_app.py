@@ -155,6 +155,18 @@ st.markdown("""
         margin-bottom: 15px; /* Space after table */
     }
 
+    /* --- HIDE VEGA ACTIONS MENU (FRAGILE - INSPECT HTML TO CONFIRM SELECTORS) --- */
+    /* Common selectors for Vega Embed actions menu. May need adjustment. */
+    /* summary[title="View chart actions"], */ /* If it's a summary element with this title */
+    /* div[class*="vega-actions"], */ /* If it's a div with a class containing "vega-actions" */
+    /* details.vega-bindings > summary, */ /* More specific if it's a details element */
+    /* details.vega-bindings > div[class*="vega-action-menu"] */ /* The dropdown part */
+    /* { */
+    /*    display: none !important; */
+    /*    visibility: hidden !important; */
+    /* } */
+
+
     .stApp > footer { visibility: hidden; }
     hr { border-top: 1px solid #374151; margin-top: 25px; margin-bottom: 25px; }
 </style>
@@ -411,7 +423,7 @@ if uploaded_file:
                                 text=alt.Text("Net Cashflow:Q", format=",.0f"), color=alt.value(bar_label_color))
                             chart = (bars + text_labels).properties(height=300, background=chart_bg_color).configure_view(
                                 strokeOpacity=0, fill=view_bg_color ).configure_axis( gridColor=grid_color, gridOpacity=0.2 )
-                            st.altair_chart(chart.configure(actions=False), use_container_width=True) # REMOVED CHART ACTIONS
+                            st.altair_chart(chart, use_container_width=True) # Chart actions menu will appear by default
                     
                     st.divider()
                     st.subheader(" summarized Totals by Party Type")
@@ -445,7 +457,7 @@ if uploaded_file:
                                     tooltip=['Party Type', alt.Tooltip('Amount:Q', format=',.0f')]
                                 ).properties(title=alt.TitleParams(text="📊 Summary by Party Type", anchor='middle', fontSize=14, fontWeight=500, color=text_color_light_for_title, dy=-5),
                                              height=alt.Step(40), background=chart_bg_color ).configure_view(strokeOpacity=0, fill=view_bg_color).configure_axis(gridColor=grid_color, gridOpacity=0.2)
-                                st.altair_chart(summary_bars.configure(actions=False), use_container_width=True) # REMOVED CHART ACTIONS
+                                st.altair_chart(summary_bars, use_container_width=True) # Chart actions menu will appear by default
                     else: st.info("No base data for Client/Supplier summary.")
 
                     st.divider()
