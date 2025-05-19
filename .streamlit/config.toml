@@ -1,10 +1,11 @@
 [theme]
-primaryColor="#007bff"
-backgroundColor="#ffffff"
-secondaryBackgroundColor="#f0f2f6"
-textColor="#262730"
-font="sans serif"
+base="dark" # Set the base theme to dark
+primaryColor="#60a5fa" # Example: Bright blue for accents (matches CSS attempt)
+backgroundColor="#121212" # Main dark background
+secondaryBackgroundColor="#1f2937" # For cards, sidebar, etc.
+textColor="#e0e0e0" # Main text color
+font="sans serif" # Or "serif", "monospace"
 
-# For dark theme (if Streamlit auto-detects or user selects)
-# You would define a corresponding dark theme palette here.
-# Streamlit handles switching these variables.
+# You can define more specific colors here if needed
+# and then try to reference them with var(--streamlit-SOME_COLOR) in CSS,
+# though direct mapping of all config.toml colors to CSS vars isn't guaranteed.
