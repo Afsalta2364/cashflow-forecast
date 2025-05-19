@@ -3,6 +3,7 @@ import pandas as pd
 import altair as alt
 from io import BytesIO
 import numpy as np
+import json # Added for parsing the JSON spec
 
 # --- Page Setup ---
 st.set_page_config(
@@ -199,21 +200,17 @@ st.markdown(f"""
     .content-section-wrapper {{
         background-color: {BG_MAIN_CONTENT_WRAPPER};
         padding: 1px 20px 20px 20px; /* Top padding 1px to contain margins, other padding for content */
-        /* border-radius: 8px; /* Optional: if main content area should have rounded corners */
-        /* margin-top: 20px; /* If title is separate */
     }}
 </style>
 """, unsafe_allow_html=True)
 
 # --- Main Title Section ---
-# This is now more of a header within the main content area
 st.markdown("""
 <div class='main-title-container'>
     <div class='main-title'>💰 Weekly Cashflow Forecast</div>
     <div class='main-subtitle'>Upload data to visualize your projected financial health.</div>
 </div>
 """, unsafe_allow_html=True)
-# st.divider() # Divider is now part of title container or CSS hr
 
 # --- Helper Functions ---
 def format_week_range(start_date):
@@ -224,17 +221,16 @@ def format_week_range(start_date):
 def style_table(df_to_style):
     """Applies custom styling to a Pandas DataFrame for HTML display, adapted for the new theme."""
     numeric_cols = df_to_style.select_dtypes(include=np.number).columns.tolist()
-    # Using theme colors
     text_color_light = TEXT_PRIMARY
     text_color_faint = TEXT_SECONDARY
-    bg_base = BG_CARD_ELEMENT # Table cells match card background
-    bg_header_gradient_start = "#334155" # Keep a subtle gradient, or make flat: BG_CARD_ELEMENT slightly darker
-    bg_header_gradient_end = BG_CARD_ELEMENT # Make header flatter or use a slightly darker shade of BG_CARD_ELEMENT
-    bg_index_cols = "#212E3C" # Slightly darker than BG_CARD_ELEMENT for index
-    bg_net_cashflow = "#334155" # Emphasized row
+    bg_base = BG_CARD_ELEMENT 
+    bg_header_gradient_start = "#334155" 
+    bg_header_gradient_end = BG_CARD_ELEMENT 
+    bg_index_cols = "#212E3C" 
+    bg_net_cashflow = "#334155" 
     border_color = BORDER_COLOR_SOFT
-    shadow_light = "rgba(200, 200, 255, 0.03)" # Very subtle shadow
-    shadow_dark = "rgba(0, 0, 0, 0.1)"        # Softer shadow
+    shadow_light = "rgba(200, 200, 255, 0.03)" 
+    shadow_dark = "rgba(0, 0, 0, 0.1)"        
 
     data_col_min_width = '110px'
     index_col_party_type_width = '100px'
@@ -250,7 +246,7 @@ def style_table(df_to_style):
             'font-size': '9pt', 'border': 'none',
             'font-family': "'Inter', 'Segoe UI', sans-serif", 'color': text_color_light,
             'width': 'auto', 'margin-left': 'auto', 'margin-right': 'auto',
-            'border-radius': '8px', 'box-shadow': f'3px 3px 7px {shadow_dark}, -1px -1px 3px {shadow_light}', # Softer shadow
+            'border-radius': '8px', 'box-shadow': f'3px 3px 7px {shadow_dark}, -1px -1px 3px {shadow_light}',
             'background-color': bg_base, 'overflow': 'hidden'
         }) \
         .set_table_styles([
@@ -262,7 +258,7 @@ def style_table(df_to_style):
             {'selector': 'th.col_heading', 'props': [('min-width', data_col_min_width), ('max-width', data_col_min_width)]},
             {'selector': 'th.index_name', 'props': [('min-width', index_col_week_range_literal_width), ('max-width', index_col_week_range_literal_width)]},
             {'selector': 'th.row_heading', 'props': [('background-color', bg_index_cols), ('border-right', f'1px solid {border_color}')]},
-            {'selector': 'th.row_heading.level0', 'props': [('font-weight', '500'), ('color', ACCENT_TEAL), ('min-width', index_col_party_type_width), ('max-width', index_col_party_type_width)]}, # Highlight party type
+            {'selector': 'th.row_heading.level0', 'props': [('font-weight', '500'), ('color', ACCENT_TEAL), ('min-width', index_col_party_type_width), ('max-width', index_col_party_type_width)]}, 
             {'selector': 'th.row_heading.level1', 'props': [('min-width', index_col_party_name_width), ('max-width', index_col_party_name_width)]},
             {'selector': 'td', 'props': [('background-color', bg_base), ('text-align', 'center'), ('vertical-align', 'middle'), ('padding', '10px 8px'), ('border-bottom', f'1px solid {border_color}'), ('border-right', f'1px solid {border_color}'), ('min-width', data_col_min_width), ('max-width', data_col_min_width)]},
             {'selector': 'td:last-child', 'props': [('border-right', 'none')]},
@@ -290,12 +286,11 @@ def style_table(df_to_style):
                         idx_loc = s.index.get_loc(i)
                         val = pd.to_numeric(val_orig, errors='coerce')
                         if pd.isna(val): continue
-                        if val > 0: # Use ACCENT_TEAL
+                        if val > 0: 
                             opacity = min(0.5, 0.15 + (val / max_abs_val) * 0.35)
-                            # Converting ACCENT_TEAL hex to rgba for opacity
                             r, g, b = tuple(int(ACCENT_TEAL.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
-                            styles[idx_loc] = f'background-color: rgba({r},{g},{b},{opacity:.2f});' # No box-shadow for flatter look
-                        elif val < 0: # Use ACCENT_RED
+                            styles[idx_loc] = f'background-color: rgba({r},{g},{b},{opacity:.2f});' 
+                        elif val < 0: 
                             opacity = min(0.5, 0.15 + (abs(val) / max_abs_val) * 0.35)
                             r, g, b = tuple(int(ACCENT_RED.lstrip('#')[i:i+2], 16) for i in (0, 2, 4))
                             styles[idx_loc] = f'background-color: rgba({r},{g},{b},{opacity:.2f});'
@@ -313,7 +308,7 @@ def style_table(df_to_style):
 # --- Sidebar for Inputs ---
 with st.sidebar:
     st.markdown("<h1>Inputs & Settings</h1>", unsafe_allow_html=True)
-    st.markdown("---", unsafe_allow_html=True) # Use HTML for themed hr if default is not good
+    st.markdown("---", unsafe_allow_html=True) 
     with st.expander("📥 Download Sample Template", expanded=False):
         sample_data = pd.DataFrame({
             "Party Type": ["Supplier", "Customer", "Supplier", "Internal"],
@@ -341,8 +336,235 @@ with st.sidebar:
     st.caption(f"<p style='color:{TEXT_SECONDARY}; font-size:0.8em;'>Developed with ❤️ by AI</p>", unsafe_allow_html=True)
 
 
+# --- Vega-Lite JSON Specification (Provided by User) ---
+vega_lite_spec_json = """
+{
+  "layer": [
+    {
+      "mark": {
+        "type": "bar",
+        "cornerRadiusTopLeft": 2,
+        "cornerRadiusTopRight": 2,
+        "size": 18
+      },
+      "encoding": {
+        "color": {
+          "condition": {
+            "test": "(datum['Net Cashflow'] >= 0)",
+            "value": "#46D9C4"
+          },
+          "value": "#FF6B6B"
+        },
+        "tooltip": [
+          {"field": "Week Range", "title": "Week", "type": "nominal"},
+          {
+            "field": "Net Cashflow",
+            "format": ",.0f",
+            "title": "Amount",
+            "type": "quantitative"
+          }
+        ],
+        "x": {
+          "axis": {"format": "%d %b", "labelAngle": -45},
+          "field": "Week Range",
+          "sort": null,
+          "title": "Week",
+          "type": "nominal"
+        },
+        "y": {
+          "axis": {"format": "~s"},
+          "field": "Net Cashflow",
+          "title": "Net Cashflow ($)",
+          "type": "quantitative"
+        }
+      },
+      "title": "📈 Weekly Net Cashflow Trend"
+    },
+    {
+      "mark": {
+        "type": "text",
+        "align": "center",
+        "baseline": "middle",
+        "dy": {"expr": "datum['Net Cashflow'] >= 0 ? -7 : 7"},
+        "fontSize": 8
+      },
+      "encoding": {
+        "color": {"value": "#E0E6F1"},
+        "text": {
+          "field": "Net Cashflow",
+          "format": ",.0f",
+          "type": "quantitative"
+        },
+        "tooltip": [
+          {"field": "Week Range", "title": "Week", "type": "nominal"},
+          {
+            "field": "Net Cashflow",
+            "format": ",.0f",
+            "title": "Amount",
+            "type": "quantitative"
+          }
+        ],
+        "x": {
+          "axis": {"format": "%d %b", "labelAngle": -45},
+          "field": "Week Range",
+          "sort": null,
+          "title": "Week",
+          "type": "nominal"
+        },
+        "y": {
+          "axis": {"format": "~s"},
+          "field": "Net Cashflow",
+          "title": "Net Cashflow ($)",
+          "type": "quantitative"
+        }
+      },
+      "title": "📈 Weekly Net Cashflow Trend"
+    }
+  ],
+  "config": {
+    "font": "\\"Source Sans Pro\\", sans-serif",
+    "background": "#2A3B4D",
+    "fieldTitle": "verbal",
+    "autosize": {"type": "fit", "contains": "padding"},
+    "title": {
+      "align": "left",
+      "anchor": "middle",
+      "color": "#E0E6F1",
+      "titleFontStyle": "normal",
+      "fontWeight": 400,
+      "fontSize": 13,
+      "orient": "top",
+      "offset": 26,
+      "dy": -5
+    },
+    "header": {
+      "titleFontWeight": 400,
+      "titleFontSize": 16,
+      "titleColor": "#e6eaf1",
+      "titleFontStyle": "normal",
+      "labelFontSize": 12,
+      "labelFontWeight": 400,
+      "labelColor": "#e6eaf1",
+      "labelFontStyle": "normal"
+    },
+    "axis": {
+      "labelFontSize": 9,
+      "labelFontWeight": 400,
+      "labelColor": "#A0A7B8",
+      "labelFontStyle": "normal",
+      "titleFontWeight": 400,
+      "titleFontSize": 10,
+      "titleColor": "#A0A7B8",
+      "titleFontStyle": "normal",
+      "ticks": false,
+      "gridColor": "#3A4A5D",
+      "domain": false,
+      "domainWidth": 1,
+      "domainColor": "#3A4A5D",
+      "labelFlush": true,
+      "labelFlushOffset": 1,
+      "labelBound": false,
+      "labelLimit": 100,
+      "titlePadding": 16,
+      "labelPadding": 16,
+      "labelSeparation": 4,
+      "labelOverlap": true,
+      "tickColor": "#3A4A5D"
+    },
+    "legend": {
+      "labelFontSize": 14,
+      "labelFontWeight": 400,
+      "labelColor": "#A0A7B8",
+      "titleFontSize": 14,
+      "titleFontWeight": 400,
+      "titleFontStyle": "normal",
+      "titleColor": "#A0A7B8",
+      "titlePadding": 5,
+      "labelPadding": 16,
+      "columnPadding": 8,
+      "rowPadding": 4,
+      "padding": 7,
+      "symbolStrokeWidth": 4,
+      "symbolType": "square"
+    },
+    "range": {
+      "category": [
+        "#83c9ff",
+        "#0068c9",
+        "#ffabab",
+        "#ff2b2b",
+        "#7defa1",
+        "#29b09d",
+        "#ffd16a",
+        "#ff8700",
+        "#6d3fc0",
+        "#d5dae5"
+      ],
+      "diverging": [
+        "#7d353b",
+        "#bd4043",
+        "#ff4b4b",
+        "#ff8c8c",
+        "#ffc7c7",
+        "#a6dcff",
+        "#60b4ff",
+        "#1c83e1",
+        "#0054a3",
+        "#004280"
+      ],
+      "ramp": [
+        "#004280",
+        "#0054a3",
+        "#0068c9",
+        "#1c83e1",
+        "#3d9df3",
+        "#60b4ff",
+        "#83c9ff",
+        "#a6dcff",
+        "#c7ebff",
+        "#e4f5ff"
+      ],
+      "heatmap": [
+        "#004280",
+        "#0054a3",
+        "#0068c9",
+        "#1c83e1",
+        "#3d9df3",
+        "#60b4ff",
+        "#83c9ff",
+        "#a6dcff",
+        "#c7ebff",
+        "#e4f5ff"
+      ]
+    },
+    "view": {
+      "columns": 1,
+      "strokeWidth": 0,
+      "stroke": null,
+      "continuousHeight": 350,
+      "continuousWidth": 400
+    },
+    "concat": {"columns": 1},
+    "facet": {"columns": 1},
+    "mark": {"tooltip": {"content": "encoding"}, "color": "#83c9ff"},
+    "bar": {"binSpacing": 4, "discreteBandSize": {"band": 0.85}},
+    "axisDiscrete": {"grid": false},
+    "axisXPoint": {"grid": false},
+    "axisTemporal": {"grid": false},
+    "axisXBand": {"grid": false}
+  },
+  "data": {"name": "06779de3a5a212123f192f1db0b3700c"},
+  "height": 280,
+  "$schema": "https://vega.github.io/schema/vega-lite/v5.20.1.json",
+  "autosize": {"type": "fit", "contains": "padding"},
+  "width": 1418,
+  "padding": {"bottom": 20}
+}
+"""
+vega_lite_spec = json.loads(vega_lite_spec_json)
+
+
 # --- Main Panel for Results ---
-# Wrap main content sections for consistent background and padding
 st.markdown("<div class='content-section-wrapper'>", unsafe_allow_html=True)
 
 if uploaded_file:
@@ -398,7 +620,6 @@ if uploaded_file:
             # --- 5. Data Preview ---
             with st.container():
                 st.subheader("📄 Uploaded Data Preview (First 5 Valid Rows)")
-                # For st.dataframe, we rely on its internal styling or the .stDataFrame CSS
                 st.dataframe(df[['party type', 'party name', 'due date', 'expected date', 'amount', 'allocation date', 'week_range']].head(), use_container_width=True, hide_index=True)
             st.divider()
 
@@ -421,45 +642,59 @@ if uploaded_file:
                     final_table = pd.concat([pivot_table, net_row_df])
             
             # --- 7. Main Forecast Display Area ---
-            with st.container(): # This container could be styled as BG_CARD_ELEMENT if needed
+            with st.container(): 
                 st.subheader("📊 Detailed Weekly Cashflow Forecast")
                 if not final_table.empty and "No Data" not in final_table.columns:
                     st.markdown(style_table(final_table).to_html(), unsafe_allow_html=True)
-
-                    # --- Altair Chart Theming for New Theme ---
-                    chart_theme_props = {
-                        "config": {
-                            "background": BG_CARD_ELEMENT, # Chart bg same as card
-                            "title": {"color": TEXT_PRIMARY, "fontSize": 13, "fontWeight": 400, "anchor": "middle", "dy": -5},
-                            "axis": {
-                                "labelColor": TEXT_SECONDARY, "titleColor": TEXT_SECONDARY,
-                                "gridColor": BORDER_COLOR_SOFT, "domainColor": BORDER_COLOR_SOFT,
-                                "tickColor": BORDER_COLOR_SOFT, "labelFontSize": 9, "titleFontSize": 10
-                            },
-                            "legend": { "labelColor": TEXT_SECONDARY, "titleColor": TEXT_SECONDARY, "symbolType": "square" },
-                            "view": {"stroke": None} # No border around chart view
-                        }
-                    }
-                    bar_label_color = TEXT_PRIMARY # Labels on bars
-
-                    # --- Weekly Net Cashflow Trend Chart ---
+                    
+                    # --- Weekly Net Cashflow Trend Chart (Updated with Vega-Lite Spec) ---
                     if not net_cashflow_series.empty:
                         net_df = net_cashflow_series.reset_index(); net_df.columns = ["Week Range", "Net Cashflow"]
                         if not net_df.empty and not net_df["Net Cashflow"].isnull().all():
                             net_df["Week Range"] = pd.Categorical(net_df["Week Range"], categories=all_week_ranges_sorted, ordered=True); net_df = net_df.sort_values("Week Range")
-                            bars = alt.Chart(net_df).mark_bar(cornerRadiusTopLeft=2, cornerRadiusTopRight=2, size=18).encode(
+                            
+                            # Get mark properties from the first layer of the spec
+                            bar_mark_spec = vega_lite_spec['layer'][0]['mark']
+                            text_mark_spec = vega_lite_spec['layer'][1]['mark']
+
+                            bars = alt.Chart(net_df).mark_bar(
+                                cornerRadiusTopLeft=bar_mark_spec.get('cornerRadiusTopLeft', 0),
+                                cornerRadiusTopRight=bar_mark_spec.get('cornerRadiusTopRight', 0),
+                                size=bar_mark_spec.get('size', 18) # Default from spec if key exists
+                            ).encode(
                                 x=alt.X("Week Range:N", sort=None, title="Week", axis=alt.Axis(labelAngle=-45, format='%d %b')),
                                 y=alt.Y("Net Cashflow:Q", title="Net Cashflow ($)", axis=alt.Axis(format="~s")),
-                                color=alt.condition(alt.datum["Net Cashflow"] >= 0, alt.value(ACCENT_TEAL), alt.value(ACCENT_RED)),
+                                color=alt.condition(alt.datum["Net Cashflow"] >= 0, alt.value(ACCENT_TEAL), alt.value(ACCENT_RED)), # Using theme constants
                                 tooltip=[alt.Tooltip("Week Range:N", title="Week"), alt.Tooltip("Net Cashflow:Q", title="Amount", format=",.0f")]
-                            ).properties(title="📈 Weekly Net Cashflow Trend")
-                            text_labels = bars.mark_text(align="center", baseline="middle", dy=alt.expr("datum['Net Cashflow'] >= 0 ? -7 : 7"), fontSize=8).encode(
-                                text=alt.Text("Net Cashflow:Q", format=",.0f"), color=alt.value(bar_label_color))
-                            chart = (bars + text_labels).properties(height=280).configure(**chart_theme_props['config'])
-                            st.altair_chart(chart, use_container_width=True)
+                            )
+                            
+                            text_labels = bars.mark_text(
+                                align=text_mark_spec.get('align', 'center'),
+                                baseline=text_mark_spec.get('baseline', 'middle'),
+                                dy=alt.expr(text_mark_spec['dy']['expr']), # dy expression from spec
+                                fontSize=text_mark_spec.get('fontSize', 8)
+                            ).encode(
+                                text=alt.Text("Net Cashflow:Q", format=",.0f"), 
+                                color=alt.value(TEXT_PRIMARY) # Text color from theme
+                            )
+                            
+                            chart_title = vega_lite_spec['layer'][0].get('title', "📈 Weekly Net Cashflow Trend") # Get title from spec if available
+
+                            chart = (bars + text_labels).properties(
+                                title=chart_title,
+                                height=vega_lite_spec.get('height', 280), # Height from spec
+                                padding=vega_lite_spec.get('padding', {"bottom": 20}) # Padding from spec
+                            ).configure(**vega_lite_spec['config']) # Apply the full config from JSON
+
+                            st.altair_chart(chart, use_container_width=True) # use_container_width for responsive width
                     
                     st.divider()
                     # --- Summarized Totals by Party Type ---
+                    # Chart Theming for Party Type Summary Chart (using a subset of the JSON config or simplified)
+                    party_type_chart_config = vega_lite_spec['config'].copy() # Start with full config
+                    # Optionally override specific parts for this chart if needed
+                    # e.g., party_type_chart_config['title']['fontSize'] = 12 
+                    
                     st.subheader(" summarized Totals by Party Type")
                     if not df.empty:
                         summary_by_type = df.groupby("party type")["amount"].sum().reset_index(); summary_by_type.columns = ["Party Type", "Total Amount"]
@@ -489,22 +724,24 @@ if uploaded_file:
                                     y=alt.Y('Party Type:N', sort='-x', title='Party Type'),
                                     color=alt.condition(alt.datum.Amount >= 0, alt.value(ACCENT_TEAL), alt.value(ACCENT_RED)),
                                     tooltip=['Party Type', alt.Tooltip('Amount:Q', format=',.0f')]
-                                ).properties(title="📊 Summary by Party Type", height=alt.Step(35)).configure(**chart_theme_props['config'])
+                                ).properties(
+                                    title="📊 Summary by Party Type", 
+                                    height=alt.Step(35) # Dynamic height based on number of bars
+                                ).configure(**party_type_chart_config) # Apply themed config
                                 st.altair_chart(summary_bars, use_container_width=True)
                     else: st.info("No base data for Client/Supplier summary.")
 
-                    # --- 8. Export Forecast ---
+                    # --- 8. Export Forecast --- (Same as before, styling adapted in helper)
                     st.divider()
                     st.subheader("📤 Export Forecast")
                     towrite = BytesIO()
                     export_table = final_table.copy()
                     if isinstance(export_table.index, pd.MultiIndex): export_table = export_table.reset_index()
                     
-                    # Excel styling (using theme colors)
                     with pd.ExcelWriter(towrite, engine="xlsxwriter") as writer:
                         export_table.to_excel(writer, sheet_name="Cashflow Forecast", index=False)
                         workbook  = writer.book; worksheet = writer.sheets["Cashflow Forecast"]
-                        header_bg_excel = BG_SIDEBAR # Use a dark bg for header
+                        header_bg_excel = BG_SIDEBAR 
                         header_font_excel = TEXT_PRIMARY
                         cell_bg_excel = BG_CARD_ELEMENT
                         cell_font_excel = TEXT_PRIMARY
@@ -518,7 +755,6 @@ if uploaded_file:
                         text_format = workbook.add_format({'font_color': cell_font_excel, 'bg_color': cell_bg_excel, 'border':1, 'border_color': BORDER_COLOR_SOFT})
                         net_cashflow_row_format_num = workbook.add_format({'num_format': '#,##0', 'bold': True, 'font_color': cell_font_excel, 'bg_color': "#334155", 'border':1, 'border_color': BORDER_COLOR_SOFT, 'top_color': BORDER_COLOR_MEDIUM, 'top':2})
                         net_cashflow_row_format_text = workbook.add_format({'bold': True, 'font_color': cell_font_excel, 'bg_color': "#334155", 'border':1, 'border_color': BORDER_COLOR_SOFT, 'top_color': BORDER_COLOR_MEDIUM, 'top':2})
-
 
                         for row_num_excel in range(len(export_table)):
                             is_net_row = "party type" in export_table.columns and export_table.iloc[row_num_excel]["party type"] == "Net Cashflow"
@@ -544,8 +780,8 @@ if uploaded_file:
 else:
     # --- Initial Landing Page Content ---
     st.info("👈 **Upload your cashflow file using the sidebar to get started!**")
-    st.markdown("---") # Themed HR
-    with st.expander("💡 How to Use This Dashboard", expanded=True): # Expander will use themed styles
+    st.markdown("---") 
+    with st.expander("💡 How to Use This Dashboard", expanded=True): 
         st.markdown(f"""
             <p style='color:{TEXT_PRIMARY};'>Welcome to your interactive Weekly Cashflow Forecast Dashboard! This tool helps you visualize your projected financial health.</p>
             <h4 style='color:{ACCENT_TEAL}; margin-top:15px;'>Steps to Get Started:</h4>
