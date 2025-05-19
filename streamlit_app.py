@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- Custom CSS for Dark Theme ---
+# --- Custom CSS for Dark Theme (Same as previous version) ---
 st.markdown("""
 <style>
     /* --- Global Styles for Dark Theme --- */
@@ -140,23 +140,20 @@ st.markdown("""
     div[data-testid="stAlert"][data-baseweb="alert-error"] { background-color: rgba(239, 68, 68, 0.15); border-color: #ef4444; color: #fecaca; }
     div[data-testid="stAlert"][data-baseweb="alert-error"] svg { fill: #fecaca; }
 
-    /* --- Dataframe Styling (Wrapper for st.dataframe) --- */
+    /* --- Dataframe Styling (Wrapper for st.dataframe AND st.markdown table) --- */
     .stDataFrame {
         border: 1px solid #374151; /* Border for st.dataframe */
         border-radius: 6px;
         overflow: hidden; /* Ensures border-radius applies to table content */
     }
-    /* For st.markdown table, styling is in style_table function AND below */
-    div.stMarkdown > div[data-testid="element-container"] > div { /* This is the direct parent of the <table> */
+    div.stMarkdown > div[data-testid="element-container"] > div {
         display: flex;
-        justify-content: center; /* Center the table within this div */
-        width: 100%; /* Ensure the div takes full available width to allow centering */
+        justify-content: center;
+        width: 100%;
     }
     div.stMarkdown > div[data-testid="element-container"] > div > table {
-        margin-bottom: 15px; /* Space after table */
-        /* Width of table itself is controlled by Styler or auto */
+        margin-bottom: 15px;
     }
-
 
     .stApp > footer { visibility: hidden; }
     hr { border-top: 1px solid #374151; margin-top: 25px; margin-bottom: 25px; }
@@ -183,87 +180,69 @@ def style_table(df_to_style):
     bg_header = "#1f2937"; bg_index_cols = "#111827"
     bg_data_cells = "#1f2937"; bg_net_cashflow = "#2b394c"
     border_color = "#374151"
-
-    # Determine a base width for data columns, can be adjusted
-    num_data_cols = len(df_to_style.columns) - df_to_style.index.nlevels # Assuming index levels are not data cols
-    # Calculate a percentage or fixed min-width. Let's use a fixed min-width for simplicity.
-    data_col_min_width = '110px'
-    index_col_party_type_width = '100px'
-    index_col_party_name_width = '120px'
-    index_col_week_range_literal_width = '90px'
-
+    data_col_min_width = '110px'; index_col_party_type_width = '100px'
+    index_col_party_name_width = '120px'; index_col_week_range_literal_width = '90px'
 
     styled_df = df_to_style.style.format(
-        lambda x: f"{x:,.0f}" if x != 0 else "-", na_rep="-" # Show '-' for zero
+        lambda x: f"{x:,.0f}" if x != 0 else "-", na_rep="-"
     ) \
         .set_caption(f"<span style='font-size: 1.1em; font-weight:500; color: {text_color_light}; display:block; margin-bottom:8px; text-align:center;'>📋 Weekly Cashflow Breakdown</span>") \
         .set_properties(**{
             'font-size': '9pt', 'border': 'none',
             'font-family': "'Inter', 'Segoe UI', sans-serif",
-            'color': text_color_light, # Default text color for cells
-            'width': 'auto', # Table width itself
-            'margin-left': 'auto', # Added for table centering
-            'margin-right': 'auto' # Added for table centering
+            'color': text_color_light, 'width': 'auto',
+            'margin-left': 'auto', 'margin-right': 'auto'
         }) \
         .set_table_styles([
             {'selector': '', 'props': [
-                ('border-collapse', 'collapse'), # Use collapse for cleaner lines
-                ('width', 'auto'), # Allow table to determine its width based on content and min-widths
-                ('min-width', '60%'), # Ensure table takes a reasonable minimum width of container
-                ('max-width', '95%')  # Prevent table from becoming too wide
-            ]},
-            {'selector': 'caption', 'props': [('caption-side', 'top')]}, # text-align already set in caption HTML
-            {'selector': 'th.col_heading', 'props': [ # Column headers (Week Ranges)
+                ('border-collapse', 'collapse'), ('width', 'auto'),
+                ('min-width', '60%'), ('max-width', '95%')]},
+            {'selector': 'caption', 'props': [('caption-side', 'top')]},
+            {'selector': 'th.col_heading', 'props': [
                 ('background-color', bg_header), ('color', text_color_light),
                 ('font-weight', '500'), ('font-size', '9pt'),
                 ('text-align', 'center'), ('vertical-align', 'middle'),
                 ('padding', '10px 8px'), ('border', f'1px solid {border_color}'),
-                ('min-width', data_col_min_width), ('max-width', data_col_min_width) # Try to enforce uniform width
+                ('min-width', data_col_min_width), ('max-width', data_col_min_width)
             ]},
-            {'selector': 'th.index_name', 'props': [ # Top-left 'week_range' literal cell
+            {'selector': 'th.index_name', 'props': [
                 ('background-color', bg_header), ('color', text_color_light),
                 ('font-weight', '500'), ('font-size', '9pt'),
                 ('text-align', 'center'), ('vertical-align', 'middle'),
                 ('padding', '10px 8px'), ('border', f'1px solid {border_color}'),
                 ('min-width', index_col_week_range_literal_width), ('max-width', index_col_week_range_literal_width)
             ]},
-            {'selector': 'th.row_heading', 'props': [ # Index columns (Party Type, Party Name)
+            {'selector': 'th.row_heading', 'props': [
                 ('background-color', bg_index_cols), ('color', text_color_light),
-                ('font-weight', 'normal'),
-                ('text-align', 'center'), ('vertical-align', 'middle'), # Center index text
-                ('padding', '10px 10px'),
-                ('border', f'1px solid {border_color}')
+                ('font-weight', 'normal'), ('text-align', 'center'), ('vertical-align', 'middle'),
+                ('padding', '10px 10px'), ('border', f'1px solid {border_color}')
             ]},
-            {'selector': 'td', 'props': [ # Data cells
+            {'selector': 'td', 'props': [
                 ('background-color', bg_data_cells), ('color', text_color_light),
                 ('text-align', 'center'), ('vertical-align', 'middle'),
                 ('padding', '10px 8px'), ('border', f'1px solid {border_color}'),
-                ('min-width', data_col_min_width), ('max-width', data_col_min_width) # Try to enforce uniform width
+                ('min-width', data_col_min_width), ('max-width', data_col_min_width)
             ]},
-            {'selector': 'th.row_heading.level0', 'props': [ # Party Type column
-                ('font-weight', '500'), ('color', '#81a1c1'), # Nord blue color
+            {'selector': 'th.row_heading.level0', 'props': [
+                ('font-weight', '500'), ('color', '#81a1c1'),
                 ('min-width', index_col_party_type_width), ('max-width', index_col_party_type_width)
             ]},
-             {'selector': 'th.row_heading.level1', 'props': [ # Party Name column
+             {'selector': 'th.row_heading.level1', 'props': [
                 ('min-width', index_col_party_name_width), ('max-width', index_col_party_name_width)
             ]},
         ])
 
-    # Conditional text color for zero values in data cells
     def color_zero_values(val):
         return f'color: {text_color_faint}' if val == 0 or pd.isna(val) else f'color: {text_color_light}'
-
     data_cols_to_style = [col for col in df_to_style.columns if df_to_style[col].dtype in ['int64', 'float64', np.number]]
     for col in data_cols_to_style:
         styled_df = styled_df.applymap(color_zero_values, subset=[col])
 
-
-    # Subtle background gradient for non-zero values in numeric columns
     if numeric_cols:
         valid_numeric_cols_for_subset = [col for col in numeric_cols if col in df_to_style.columns]
         if valid_numeric_cols_for_subset:
             try:
-                def subtle_gradient_for_dark(s): # s is a Series (a column)
+                def subtle_gradient_for_dark(s):
                     styles = [''] * len(s)
                     max_abs_val = s.abs().max()
                     if pd.isna(max_abs_val) or max_abs_val == 0: max_abs_val = 1
@@ -402,16 +381,16 @@ if uploaded_file:
 
             # --- Main Forecast Display Area ---
             with st.container():
-                st.subheader("📊 Detailed Weekly Cashflow Forecast") # Styled by CSS
+                st.subheader("📊 Detailed Weekly Cashflow Forecast")
                 if not final_table.empty and "No Data" not in final_table.columns:
                     st.markdown(style_table(final_table).to_html(), unsafe_allow_html=True)
-                    # Remove <br> to reduce space if chart is next
-                    # st.markdown("<br>", unsafe_allow_html=True) 
+                    # No <br> here, chart will follow directly if it has data
 
                     # Altair chart configuration for dark theme
-                    chart_bg_color = '#121212'; chart_text_color = '#9ca3af'; grid_color = '#374151'
-                    positive_color = '#10b981'; negative_color = '#ef4444'; bar_label_color = '#f3f4f6'
-                    text_color_light_for_title = "#d1d5db" # For chart title
+                    chart_bg_color = '#121212'; view_bg_color = '#121212'
+                    chart_text_color = '#9ca3af'; grid_color = '#374151'
+                    positive_color = '#10b981'; negative_color = '#ef4444'
+                    bar_label_color = '#f3f4f6'; text_color_light_for_title = "#d1d5db"
 
                     if not net_cashflow_series.empty:
                         net_df = net_cashflow_series.reset_index()
@@ -439,13 +418,13 @@ if uploaded_file:
                         )
                         
                         chart = (bars + text_labels).properties(height=300, background=chart_bg_color).configure_view(
-                            strokeOpacity=0 ).configure_axis( gridOpacity=0.3 )
+                            strokeOpacity=0, fill=view_bg_color ).configure_axis( gridColor=grid_color, gridOpacity=0.2 )
                         st.altair_chart(chart, use_container_width=True)
                     else: st.info("ℹ️ Not enough data for Net Cashflow chart.")
                     
                     # --- Client and Supplier Wise Summary ---
                     st.divider()
-                    st.subheader(" summarized Totals by Party Type") # Styled by CSS
+                    st.subheader(" summarized Totals by Party Type")
                     if not df.empty:
                         summary_by_type = df.groupby("party type")["amount"].sum().reset_index()
                         summary_by_type.columns = ["Party Type", "Total Amount"]
@@ -462,7 +441,8 @@ if uploaded_file:
                             for _, row in other_types_summary.iterrows():
                                 st.markdown(f"- **{row['Party Type']}**: {row['Total Amount']:,.0f}")
                             st.caption("Positive: net inflow, Negative: net outflow.")
-                        st.markdown("<br>", unsafe_allow_html=True)
+                        # Removed <br> to reduce space if chart is next
+                        # st.markdown("<br>", unsafe_allow_html=True)
 
                         chart_summary_data = []
                         if customers_total != 0: chart_summary_data.append({"Party Type": "Customers", "Amount": customers_total, "Flow": "Inflow"})
@@ -478,16 +458,16 @@ if uploaded_file:
                                                       domainColor=grid_color, tickColor=grid_color, gridColor=grid_color, format="~s")),
                                 y=alt.Y('Party Type:N', sort='-x', title='Party Type',
                                         axis=alt.Axis(labelFontSize=9, titleFontSize=10, titleColor=chart_text_color, labelColor=chart_text_color,
-                                                      domainColor=grid_color, tickColor=grid_color)),
+                                                      domainColor=grid_color, tickColor=grid_color)), # No grid for y-axis here
                                 color=alt.condition(alt.datum.Amount >= 0, alt.value(positive_color), alt.value(negative_color)),
                                 tooltip=['Party Type', alt.Tooltip('Amount:Q', format=',.0f')]
                             ).properties(title=alt.TitleParams(text="📊 Summary by Party Type", anchor='middle', fontSize=14, fontWeight=500, color=text_color_light_for_title, dy=-5),
-                                         height=alt.Step(40)).configure_view(strokeOpacity=0).configure_axis(gridOpacity=0.2).properties(background=chart_bg_color)
+                                         height=alt.Step(40), background=chart_bg_color ).configure_view(strokeOpacity=0, fill=view_bg_color).configure_axis(gridColor=grid_color, gridOpacity=0.2)
                             st.altair_chart(summary_bars, use_container_width=True)
                     else: st.info("No data to generate Client/Supplier summary.")
 
                     st.divider()
-                    st.subheader("📤 Export Forecast") # Styled by CSS
+                    st.subheader("📤 Export Forecast")
                     towrite = BytesIO()
                     export_table = final_table.copy()
                     if isinstance(export_table.index, pd.MultiIndex): export_table = export_table.reset_index()
