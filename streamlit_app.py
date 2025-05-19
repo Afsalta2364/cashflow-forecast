@@ -146,8 +146,17 @@ st.markdown("""
         border-radius: 6px;
         overflow: hidden; /* Ensures border-radius applies to table content */
     }
-    /* For st.markdown table, styling is in style_table function */
-    div[data-testid="stMarkdown"] > div[data-testid="element-container"] > div > table { margin-bottom: 25px; }
+    /* For st.markdown table, styling is in style_table function AND below */
+    div.stMarkdown > div[data-testid="element-container"] > div { /* This is the direct parent of the <table> */
+        display: flex;
+        justify-content: center; /* Center the table within this div */
+        width: 100%; /* Ensure the div takes full available width to allow centering */
+    }
+    div.stMarkdown > div[data-testid="element-container"] > div > table {
+        margin-bottom: 15px; /* Space after table */
+        /* Width of table itself is controlled by Styler or auto */
+    }
+
 
     .stApp > footer { visibility: hidden; }
     hr { border-top: 1px solid #374151; margin-top: 25px; margin-bottom: 25px; }
@@ -175,68 +184,104 @@ def style_table(df_to_style):
     bg_data_cells = "#1f2937"; bg_net_cashflow = "#2b394c"
     border_color = "#374151"
 
+    # Determine a base width for data columns, can be adjusted
+    num_data_cols = len(df_to_style.columns) - df_to_style.index.nlevels # Assuming index levels are not data cols
+    # Calculate a percentage or fixed min-width. Let's use a fixed min-width for simplicity.
+    data_col_min_width = '110px'
+    index_col_party_type_width = '100px'
+    index_col_party_name_width = '120px'
+    index_col_week_range_literal_width = '90px'
+
+
     styled_df = df_to_style.style.format(
-        lambda x: f"{x:,.0f}" if x != 0 else "-", na_rep="-"
+        lambda x: f"{x:,.0f}" if x != 0 else "-", na_rep="-" # Show '-' for zero
     ) \
-        .set_caption(f"<span style='font-size: 1.1em; font-weight:500; color: {text_color_light}; display:block; margin-bottom:8px; text-align:left;'>📋 Weekly Cashflow Breakdown</span>") \
+        .set_caption(f"<span style='font-size: 1.1em; font-weight:500; color: {text_color_light}; display:block; margin-bottom:8px; text-align:center;'>📋 Weekly Cashflow Breakdown</span>") \
         .set_properties(**{
-            'font-size': '9pt', 'border': 'none', 'width': 'auto',
-            'font-family': "'Inter', 'Segoe UI', sans-serif", 'color': text_color_light
+            'font-size': '9pt', 'border': 'none',
+            'font-family': "'Inter', 'Segoe UI', sans-serif",
+            'color': text_color_light, # Default text color for cells
+            'width': 'auto', # Table width itself
+            'margin-left': 'auto', # Added for table centering
+            'margin-right': 'auto' # Added for table centering
         }) \
         .set_table_styles([
-            {'selector': '', 'props': [('border-collapse', 'collapse')]},
-            {'selector': 'caption', 'props': [('caption-side', 'top')]},
-            {'selector': 'th.col_heading', 'props': [
-                ('background-color', bg_header), ('color', text_color_light),
-                ('font-weight', '500'), ('font-size', '9pt'), ('text-align', 'center'),
-                ('padding', '8px 6px'), ('border', f'1px solid {border_color}')
+            {'selector': '', 'props': [
+                ('border-collapse', 'collapse'), # Use collapse for cleaner lines
+                ('width', 'auto'), # Allow table to determine its width based on content and min-widths
+                ('min-width', '60%'), # Ensure table takes a reasonable minimum width of container
+                ('max-width', '95%')  # Prevent table from becoming too wide
             ]},
-            {'selector': 'th.index_name', 'props': [
+            {'selector': 'caption', 'props': [('caption-side', 'top')]}, # text-align already set in caption HTML
+            {'selector': 'th.col_heading', 'props': [ # Column headers (Week Ranges)
                 ('background-color', bg_header), ('color', text_color_light),
-                ('font-weight', '500'), ('font-size', '9pt'), ('text-align', 'left'),
-                ('padding', '8px 6px'), ('border', f'1px solid {border_color}')
+                ('font-weight', '500'), ('font-size', '9pt'),
+                ('text-align', 'center'), ('vertical-align', 'middle'),
+                ('padding', '10px 8px'), ('border', f'1px solid {border_color}'),
+                ('min-width', data_col_min_width), ('max-width', data_col_min_width) # Try to enforce uniform width
             ]},
-            {'selector': 'th.row_heading', 'props': [
+            {'selector': 'th.index_name', 'props': [ # Top-left 'week_range' literal cell
+                ('background-color', bg_header), ('color', text_color_light),
+                ('font-weight', '500'), ('font-size', '9pt'),
+                ('text-align', 'center'), ('vertical-align', 'middle'),
+                ('padding', '10px 8px'), ('border', f'1px solid {border_color}'),
+                ('min-width', index_col_week_range_literal_width), ('max-width', index_col_week_range_literal_width)
+            ]},
+            {'selector': 'th.row_heading', 'props': [ # Index columns (Party Type, Party Name)
                 ('background-color', bg_index_cols), ('color', text_color_light),
-                ('font-weight', 'normal'), ('text-align', 'left'), ('padding', '8px 10px'),
+                ('font-weight', 'normal'),
+                ('text-align', 'center'), ('vertical-align', 'middle'), # Center index text
+                ('padding', '10px 10px'),
                 ('border', f'1px solid {border_color}')
             ]},
-            {'selector': 'td', 'props': [
+            {'selector': 'td', 'props': [ # Data cells
                 ('background-color', bg_data_cells), ('color', text_color_light),
-                ('text-align', 'right'), ('padding', '8px 10px'),
-                ('border', f'1px solid {border_color}')
+                ('text-align', 'center'), ('vertical-align', 'middle'),
+                ('padding', '10px 8px'), ('border', f'1px solid {border_color}'),
+                ('min-width', data_col_min_width), ('max-width', data_col_min_width) # Try to enforce uniform width
             ]},
-            {'selector': 'th.row_heading.level0', 'props': [('font-weight', '500'), ('color', '#81a1c1')]},
+            {'selector': 'th.row_heading.level0', 'props': [ # Party Type column
+                ('font-weight', '500'), ('color', '#81a1c1'), # Nord blue color
+                ('min-width', index_col_party_type_width), ('max-width', index_col_party_type_width)
+            ]},
+             {'selector': 'th.row_heading.level1', 'props': [ # Party Name column
+                ('min-width', index_col_party_name_width), ('max-width', index_col_party_name_width)
+            ]},
         ])
 
+    # Conditional text color for zero values in data cells
     def color_zero_values(val):
         return f'color: {text_color_faint}' if val == 0 or pd.isna(val) else f'color: {text_color_light}'
-    for col in df_to_style.columns:
-        if df_to_style[col].dtype in ['int64', 'float64', np.number]:
-             styled_df = styled_df.applymap(color_zero_values, subset=[col])
 
+    data_cols_to_style = [col for col in df_to_style.columns if df_to_style[col].dtype in ['int64', 'float64', np.number]]
+    for col in data_cols_to_style:
+        styled_df = styled_df.applymap(color_zero_values, subset=[col])
+
+
+    # Subtle background gradient for non-zero values in numeric columns
     if numeric_cols:
         valid_numeric_cols_for_subset = [col for col in numeric_cols if col in df_to_style.columns]
         if valid_numeric_cols_for_subset:
             try:
-                def subtle_gradient_for_dark(s):
+                def subtle_gradient_for_dark(s): # s is a Series (a column)
                     styles = [''] * len(s)
                     max_abs_val = s.abs().max()
                     if pd.isna(max_abs_val) or max_abs_val == 0: max_abs_val = 1
                     for i, val in s.items():
+                        idx_loc = s.index.get_loc(i)
                         if val > 0:
                             opacity = min(0.3, 0.05 + (val / max_abs_val) * 0.25)
-                            styles[s.index.get_loc(i)] = f'background-color: rgba(16, 185, 129, {opacity})'
+                            styles[idx_loc] = f'background-color: rgba(16, 185, 129, {opacity})'
                         elif val < 0:
                             opacity = min(0.3, 0.05 + (abs(val) / max_abs_val) * 0.25)
-                            styles[s.index.get_loc(i)] = f'background-color: rgba(239, 68, 68, {opacity})'
+                            styles[idx_loc] = f'background-color: rgba(239, 68, 68, {opacity})'
                     return styles
                 styled_df = styled_df.apply(subtle_gradient_for_dark, subset=valid_numeric_cols_for_subset, axis=0)
             except Exception as e: st.warning(f"Could not apply custom background gradient: {e}.")
 
     def style_net_cashflow_row(row):
         if row.name == ("Net Cashflow", ""):
-            return [f'font-weight: 500; background-color: {bg_net_cashflow}; color: {text_color_light}; border: 1px solid {border_color}; font-size:10pt;'] * len(row)
+            return [f'font-weight: 500; background-color: {bg_net_cashflow}; color: {text_color_light}; border: 1px solid {border_color}; font-size:10pt; text-align:center; vertical-align:middle;'] * len(row)
         return [''] * len(row)
     styled_df = styled_df.apply(style_net_cashflow_row, axis=1)
     return styled_df
@@ -357,16 +402,16 @@ if uploaded_file:
 
             # --- Main Forecast Display Area ---
             with st.container():
-                st.subheader("📊 Detailed Weekly Cashflow Forecast")
+                st.subheader("📊 Detailed Weekly Cashflow Forecast") # Styled by CSS
                 if not final_table.empty and "No Data" not in final_table.columns:
                     st.markdown(style_table(final_table).to_html(), unsafe_allow_html=True)
-                    st.markdown("<br>", unsafe_allow_html=True)
+                    # Remove <br> to reduce space if chart is next
+                    # st.markdown("<br>", unsafe_allow_html=True) 
 
                     # Altair chart configuration for dark theme
                     chart_bg_color = '#121212'; chart_text_color = '#9ca3af'; grid_color = '#374151'
                     positive_color = '#10b981'; negative_color = '#ef4444'; bar_label_color = '#f3f4f6'
-                    text_color_light_for_title = "#d1d5db"
-
+                    text_color_light_for_title = "#d1d5db" # For chart title
 
                     if not net_cashflow_series.empty:
                         net_df = net_cashflow_series.reset_index()
@@ -396,11 +441,11 @@ if uploaded_file:
                         chart = (bars + text_labels).properties(height=300, background=chart_bg_color).configure_view(
                             strokeOpacity=0 ).configure_axis( gridOpacity=0.3 )
                         st.altair_chart(chart, use_container_width=True)
-                    else: st.info("ℹ️ Not enough data for Net Cashflow chart.") # Styled by CSS
+                    else: st.info("ℹ️ Not enough data for Net Cashflow chart.")
                     
                     # --- Client and Supplier Wise Summary ---
                     st.divider()
-                    st.subheader(" summarized Totals by Party Type")
+                    st.subheader(" summarized Totals by Party Type") # Styled by CSS
                     if not df.empty:
                         summary_by_type = df.groupby("party type")["amount"].sum().reset_index()
                         summary_by_type.columns = ["Party Type", "Total Amount"]
@@ -439,10 +484,10 @@ if uploaded_file:
                             ).properties(title=alt.TitleParams(text="📊 Summary by Party Type", anchor='middle', fontSize=14, fontWeight=500, color=text_color_light_for_title, dy=-5),
                                          height=alt.Step(40)).configure_view(strokeOpacity=0).configure_axis(gridOpacity=0.2).properties(background=chart_bg_color)
                             st.altair_chart(summary_bars, use_container_width=True)
-                    else: st.info("No data to generate Client/Supplier summary.") # Styled by CSS
+                    else: st.info("No data to generate Client/Supplier summary.")
 
                     st.divider()
-                    st.subheader("📤 Export Forecast")
+                    st.subheader("📤 Export Forecast") # Styled by CSS
                     towrite = BytesIO()
                     export_table = final_table.copy()
                     if isinstance(export_table.index, pd.MultiIndex): export_table = export_table.reset_index()
@@ -457,9 +502,9 @@ if uploaded_file:
                             is_party_col = col_name.lower() in ["party type", "party name"]
                             if not is_party_col and (export_table[col_name].dtype in ['int64', 'float64', np.number]):
                                  worksheet.set_column(col_idx, col_idx, None, money_format)
-                    st.download_button(label="Download Forecast as Excel", data=towrite.getvalue(), file_name="cashflow_forecast.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") # Styled by CSS
-                else: st.info("ℹ️ No forecast table to display.") # Styled by CSS
-        except pd.errors.ParserError: st.error("❌ Error parsing the uploaded file.") # Styled by CSS
+                    st.download_button(label="Download Forecast as Excel", data=towrite.getvalue(), file_name="cashflow_forecast.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                else: st.info("ℹ️ No forecast table to display.")
+        except pd.errors.ParserError: st.error("❌ Error parsing the uploaded file.")
         except ImportError as ie:
             if "matplotlib" in str(ie).lower(): st.error("❌ Matplotlib is missing. Install with `pip install matplotlib`.")
             else: st.error(f"Import error: {ie}.")
@@ -468,7 +513,7 @@ if uploaded_file:
             st.error(f"An unexpected error occurred during processing.")
             st.exception(e)
 else:
-    st.info("👈 **Upload your cashflow file using the sidebar to get started!**") # Styled by CSS
+    st.info("👈 **Upload your cashflow file using the sidebar to get started!**")
     st.markdown("---")
     with st.expander("💡 How to Use This Dashboard", expanded=True):
         st.markdown("""
