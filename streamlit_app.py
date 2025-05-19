@@ -22,48 +22,139 @@ MIN_COLOR_POSITIVE = "#28A745"
 MIN_COLOR_NEGATIVE = "#DC3545"
 MIN_COLOR_BORDER = "#E9ECEF"
 
-# --- Custom CSS ---
+# --- Custom CSS for Clean & Elegant Look ---
 st.markdown(f"""
 <style>
-    /* Base body styling for minimalism */
+    /* Body styling */
     body {{
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
         color: {MIN_COLOR_TEXT_PRIMARY};
         background-color: {MIN_COLOR_BACKGROUND};
+        margin: 0;
+        padding: 0 2rem;
     }}
 
-    /* Custom header styling */
+    /* Header */
     .main-header-minimal {{
-        padding: 2rem 0rem;
+        padding: 2rem 0 1.5rem 0;
         text-align: left;
-        border-bottom: 1px solid {MIN_COLOR_BORDER};
+        border-bottom: 2px solid {MIN_COLOR_ACCENT};
         margin-bottom: 2rem;
     }}
     .main-title-minimal {{
-        font-size: 2.5rem;
-        font-weight: 600;
+        font-size: 2.75rem;
+        font-weight: 700;
         color: {MIN_COLOR_TEXT_PRIMARY};
-        margin-bottom: 0.5rem;
+        margin-bottom: 0.3rem;
+        letter-spacing: -0.03em;
     }}
     .main-subtitle-minimal {{
-        font-size: 1.1rem;
+        font-size: 1.15rem;
+        font-weight: 400;
         color: {MIN_COLOR_TEXT_SECONDARY};
+        letter-spacing: 0.01em;
     }}
 
-    /* Metric styles */
-    div[data-testid="stMetric"] > div > div:first-child {{ /* Metric label */
+    /* Metrics */
+    div[data-testid="stMetric"] > div > div:first-child {{
         color: {MIN_COLOR_TEXT_SECONDARY};
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }}
+    div[data-testid="stMetric"] > div > div:last-child {{
+        font-size: 1.6rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        color: {MIN_COLOR_TEXT_PRIMARY};
     }}
 
     /* Sidebar header */
     .stSidebar h1 {{
-        font-size: 1.5rem;
-        font-weight: 600;
+        font-size: 1.75rem;
+        font-weight: 700;
         color: {MIN_COLOR_ACCENT};
-        padding-bottom: 0.5rem;
-        border-bottom: 1px solid {MIN_COLOR_BORDER};
-        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 2px solid {MIN_COLOR_BORDER};
+        margin-bottom: 1.25rem;
     }}
+
+    /* Table styles */
+    table.dataframe {{
+        border-collapse: separate !important;
+        border-spacing: 0 8px !important;
+        width: 100% !important;
+        font-size: 11pt !important;
+        font-weight: 500 !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+        color: {MIN_COLOR_TEXT_PRIMARY} !important;
+    }}
+
+    table.dataframe th {{
+        background-color: #F3F6F9 !important;
+        color: {MIN_COLOR_ACCENT} !important;
+        font-weight: 700 !important;
+        text-align: left !important;
+        padding: 14px 20px !important;
+        border-bottom: 2px solid {MIN_COLOR_ACCENT} !important;
+        letter-spacing: 0.02em;
+        user-select: none;
+        vertical-align: middle !important;
+    }}
+
+    table.dataframe th.col_heading {{
+        text-align: center !important;
+        font-weight: 600 !important;
+    }}
+
+    table.dataframe th.row_heading {{
+        text-align: left !important;
+        padding-left: 20px !important;
+    }}
+
+    table.dataframe td {{
+        padding: 12px 20px !important;
+        border-bottom: 1px solid {MIN_COLOR_BORDER} !important;
+        vertical-align: middle !important;
+        font-weight: 500 !important;
+        text-align: right !important;
+        white-space: nowrap;
+    }}
+
+    table.dataframe td.row_heading {{
+        text-align: left !important;
+        padding-left: 20px !important;
+    }}
+
+    /* Numeric columns align right */
+    table.dataframe td.numeric {{
+        text-align: right !important;
+        font-feature-settings: "tnum" !important; /* Tabular numbers for alignment */
+        font-variant-numeric: tabular-nums !important;
+    }}
+
+    /* Hover effect */
+    table.dataframe tbody tr:hover td {{
+        background-color: #E9F2FF !important;
+        transition: background-color 0.2s ease-in-out;
+    }}
+
+    /* Net cashflow row highlight */
+    table.dataframe tbody tr.net-cashflow-row td {{
+        font-weight: 700 !important;
+        background-color: #F9FAFB !important;
+        color: {MIN_COLOR_TEXT_PRIMARY} !important;
+        border-top: 2px solid {MIN_COLOR_ACCENT} !important;
+        border-bottom: 2px solid {MIN_COLOR_ACCENT} !important;
+    }}
+
+    /* Scrollbar for large tables */
+    div[data-testid="stDataFrame"] > div:first-child {{
+        overflow-x: auto;
+        border-radius: 8px;
+        box-shadow: inset 0 0 5px #d6d9dc;
+        padding-bottom: 10px;
+    }}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -81,7 +172,7 @@ def format_week_range(start_date):
     return f"{start_date.strftime('%d %b')} - {end_date.strftime('%d %b %Y')}"
 
 @st.cache_data
-def process_data(uploaded_file):  # Make it a function with @st.cache_data
+def process_data(uploaded_file):
     try:
         if uploaded_file.name.endswith(".csv"):
             df = pd.read_csv(uploaded_file)
@@ -133,14 +224,13 @@ def process_data(uploaded_file):  # Make it a function with @st.cache_data
                 columns=net_row_values.index
             )
             final_table = pd.concat([pivot_table, net_row])
-        elif not df.empty :
+        elif not df.empty:
             st.info("No weekly data to display in the forecast table.")
             final_table = pd.DataFrame(columns=['No Data Available']).set_index(pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
-
         else:
             final_table = pd.DataFrame()
 
-        return df, final_table, "OK" # return status indicator for control flow
+        return df, final_table, "OK"
 
     except Exception as e:
         st.error(f"An error occurred during processing: {str(e)}")
@@ -149,46 +239,48 @@ def process_data(uploaded_file):  # Make it a function with @st.cache_data
         return pd.DataFrame(), pd.DataFrame(), "Error"
 
 def style_table_minimal(df_to_style):
-    styled_df = df_to_style.style.format(
-        lambda x: f"{x:,.0f}" if isinstance(x, (int, float)) and x != 0 else "—",
-        na_rep="—"
-    ).set_properties(**{
-        'font-size': '10pt',
-        'border': f'1px solid {MIN_COLOR_BORDER}',
-        'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
-        'color': MIN_COLOR_TEXT_PRIMARY,
-        'width': 'auto',
-        'margin': 'auto'
-    }).set_table_styles([
-        {'selector': 'th', 'props': [
-            ('text-align', 'left'),
-            ('padding', '10px 12px'),
-            ('background-color', '#F8F9FA'),
-            ('border-bottom', f'2px solid {MIN_COLOR_ACCENT}')]},
-        {'selector': 'th.col_heading', 'props': [('text-align', 'center')]},
-        {'selector': 'th.row_heading', 'props': [('text-align', 'left')]},
-        {'selector': 'td', 'props': [
-            ('text-align', 'right'),
-            ('padding', '10px 12px'),
-            ('border-bottom', f'1px solid {MIN_COLOR_BORDER}')]},
-        {'selector': 'tr:hover td', 'props': [('background-color', '#EFF7FF')]},
-        {'selector': 'tr:last-child td', 'props': [('border-bottom', 'none')]},
-    ])
+    def fmt(x):
+        if pd.isna(x) or x == 0:
+            return "—"
+        if isinstance(x, (int, float)):
+            return f"{x:,.0f}"
+        return x
+
+    styled_df = df_to_style.style.format(fmt)\
+        .set_properties(**{
+            'font-family': "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+            'font-size': '11pt',
+            'font-weight': '500',
+            'color': MIN_COLOR_TEXT_PRIMARY,
+            'border-spacing': '0 8px',
+            'white-space': 'nowrap'
+        })
 
     numeric_cols = df_to_style.select_dtypes(include=np.number).columns.tolist()
-    def color_values(val):
+    all_cols = df_to_style.columns.tolist()
+    left_cols = [col for col in all_cols if col not in numeric_cols]
+
+    for col in numeric_cols:
+        styled_df = styled_df.set_properties(subset=[col], **{'text-align': 'right', 'font-variant-numeric': 'tabular-nums'})
+    for col in left_cols:
+        styled_df = styled_df.set_properties(subset=[col], **{'text-align': 'left'})
+
+    def color_vals(val):
         if isinstance(val, (int, float)):
-            if val > 0: return f'color: {MIN_COLOR_POSITIVE};'
-            if val < 0: return f'color: {MIN_COLOR_NEGATIVE};'
+            if val > 0:
+                return f'color: {MIN_COLOR_POSITIVE};'
+            elif val < 0:
+                return f'color: {MIN_COLOR_NEGATIVE};'
         return ''
-    styled_df = styled_df.map(color_values, subset=numeric_cols)
+
+    styled_df = styled_df.applymap(color_vals)
 
     if not df_to_style.empty and ("Net Cashflow", "") in df_to_style.index:
-        def highlight_net_cashflow_row(row_series):
-            if row_series.name == ("Net Cashflow", ""):
-                return [f'font-weight: 600; background-color: #F1F3F5; color: {MIN_COLOR_TEXT_PRIMARY};'] * len(row_series)
-            return [''] * len(row_series)
-        styled_df = styled_df.apply(highlight_net_cashflow_row, axis=1)
+        def highlight_net(row):
+            if row.name == ("Net Cashflow", ""):
+                return ['font-weight: 700; background-color: #F9FAFB; color: '+MIN_COLOR_TEXT_PRIMARY+'; border-top: 2px solid '+MIN_COLOR_ACCENT+'; border-bottom: 2px solid '+MIN_COLOR_ACCENT+';'] * len(row)
+            return [''] * len(row)
+        styled_df = styled_df.apply(highlight_net, axis=1)
 
     return styled_df
 
@@ -220,7 +312,7 @@ with st.sidebar:
 # --- Main Content ---
 if uploaded_file:
     with st.spinner("Processing data..."):
-        df, final_table, processing_status = process_data(uploaded_file)  # Call data processing function
+        df, final_table, processing_status = process_data(uploaded_file)
 
         if processing_status == "OK":
             st.subheader("Financial Overview")
@@ -248,13 +340,11 @@ if uploaded_file:
                 else:
                     st.info("No data to display in the forecast table.")
 
-
             with tab2:
                 st.markdown("#### Net Cashflow Trend")
                 if not final_table.empty and ("Net Cashflow", "") in final_table.index and not final_table.columns.empty and not ("No Data Available" in final_table.columns):
                     net_series = final_table.loc[("Net Cashflow", "")]
-                    net_data = net_series.reset_index()
-                    net_data.rename(columns={("Net Cashflow", ""): 'Net_Cashflow_Value', 'week_range': 'Week'}, inplace=True)
+                    net_data = net_series.reset_index(name='Net_Cashflow_Value').rename(columns={'week_range': 'Week'})
 
                     if not net_data.empty:
                         chart = alt.Chart(net_data).mark_bar().encode(
@@ -275,7 +365,6 @@ if uploaded_file:
                         st.info("No data available for trend analysis.")
                 else:
                     st.info("No data available for trend analysis. Upload data or check data integrity.")
-
 
             with tab3:
                 st.markdown("#### Raw Input Data (Processed)")
@@ -298,8 +387,6 @@ if uploaded_file:
                     )
                 else:
                     st.info("No forecast data to export.")
-        #elif status != "OK" will already have been handled by the process_data function using st.error or st.info
-
 else:
     st.info("👋 Welcome! Please upload a cashflow data file using the sidebar to begin analysis.")
     with st.expander("ℹ️ How to use this dashboard", expanded=False):
