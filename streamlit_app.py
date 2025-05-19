@@ -23,8 +23,6 @@ MIN_COLOR_NEGATIVE = "#DC3545"
 MIN_COLOR_BORDER = "#E9ECEF"
 
 # --- Custom CSS ---
-# Assuming the CSS part is intentionally minimal or managed elsewhere.
-# If specific CSS styles were intended here, they should be added.
 st.markdown(f"""
 <style>
     /* Base body styling for minimalism */
@@ -66,7 +64,6 @@ st.markdown(f"""
         border-bottom: 1px solid {MIN_COLOR_BORDER};
         margin-bottom: 1rem;
     }}
-    /* ... (any other original CSS styles if they existed) ... */
 </style>
 """, unsafe_allow_html=True)
 
@@ -81,7 +78,75 @@ st.markdown("""
 # --- Helper Functions ---
 def format_week_range(start_date):
     end_date = start_date + pd.Timedelta(days=6)
-    return f"{start_date.strftime('%d %b')} - {end_date.strftime('%d %b %Y')}" # Added %Y for year clarity
+    return f"{start_date.strftime('%d %b')} - {end_date.strftime('%d %b %Y')}"
+
+@st.cache_data
+def process_data(uploaded_file):  # Make it a function with @st.cache_data
+    try:
+        if uploaded_file.name.endswith(".csv"):
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(uploaded_file, engine='openpyxl')
+
+        required_cols = {"party type", "party name", "due date", "expected date", "amount"}
+        df.columns = df.columns.str.lower().str.strip()
+        missing_cols = required_cols - set(df.columns)
+        if missing_cols:
+            st.error(f"Missing columns: {', '.join(missing_cols)}")
+            st.stop()
+
+        df = df.dropna(subset=['party type', 'party name'])
+        df['amount'] = pd.to_numeric(df['amount'], errors='coerce').fillna(0)
+        for col in ["due date", "expected date"]:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+        df = df.dropna(subset=["due date", "expected date", "amount"])
+
+        if df.empty:
+            st.warning("No valid data found after cleaning. Please check your file.")
+            st.stop()
+
+        df["allocation date"] = df[["due date", "expected date"]].max(axis=1)
+        df["week_start"] = df["allocation date"].dt.to_period("W").dt.start_time
+
+        df = df.sort_values("week_start")
+        df["week_range"] = df["week_start"].apply(format_week_range)
+        ordered_week_ranges = df["week_range"].unique()
+        df["week_range"] = pd.Categorical(df["week_range"], categories=ordered_week_ranges, ordered=True)
+
+        pivot_table = df.pivot_table(
+            index=["party type", "party name"],
+            columns="week_range",
+            values="amount",
+            aggfunc="sum",
+            fill_value=0
+        )
+
+        if pivot_table.empty and not df.empty:
+            st.warning("Could not create a pivot table. This might happen if data structure is not suitable for pivoting as configured (e.g. not enough distinct party types/names).")
+            return df, pd.DataFrame(), "No Pivot"
+
+        if not pivot_table.columns.empty:
+            net_row_values = pivot_table.sum()
+            net_row = pd.DataFrame(
+                [net_row_values.values],
+                index=pd.MultiIndex.from_tuples([("Net Cashflow", "")]),
+                columns=net_row_values.index
+            )
+            final_table = pd.concat([pivot_table, net_row])
+        elif not df.empty :
+            st.info("No weekly data to display in the forecast table.")
+            final_table = pd.DataFrame(columns=['No Data Available']).set_index(pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
+
+        else:
+            final_table = pd.DataFrame()
+
+        return df, final_table, "OK" # return status indicator for control flow
+
+    except Exception as e:
+        st.error(f"An error occurred during processing: {str(e)}")
+        import traceback
+        st.error(f"Traceback: {traceback.format_exc()}")
+        return pd.DataFrame(), pd.DataFrame(), "Error"
 
 def style_table_minimal(df_to_style):
     styled_df = df_to_style.style.format(
@@ -92,21 +157,21 @@ def style_table_minimal(df_to_style):
         'border': f'1px solid {MIN_COLOR_BORDER}',
         'font-family': "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
         'color': MIN_COLOR_TEXT_PRIMARY,
-        'width': 'auto', # Ensure table width is reasonable
-        'margin': 'auto' # Center table if it's narrower than container
+        'width': 'auto',
+        'margin': 'auto'
     }).set_table_styles([
         {'selector': 'th', 'props': [
             ('text-align', 'left'),
             ('padding', '10px 12px'),
-            ('background-color', '#F8F9FA'), # Light gray for headers
-            ('border-bottom', f'2px solid {MIN_COLOR_ACCENT}')]}, # Accent border for headers
-        {'selector': 'th.col_heading', 'props': [('text-align', 'center')]}, # Center column headers
-        {'selector': 'th.row_heading', 'props': [('text-align', 'left')]}, # Left align row headers (index)
+            ('background-color', '#F8F9FA'),
+            ('border-bottom', f'2px solid {MIN_COLOR_ACCENT}')]},
+        {'selector': 'th.col_heading', 'props': [('text-align', 'center')]},
+        {'selector': 'th.row_heading', 'props': [('text-align', 'left')]},
         {'selector': 'td', 'props': [
-            ('text-align', 'right'), # Typically numbers are right-aligned
+            ('text-align', 'right'),
             ('padding', '10px 12px'),
             ('border-bottom', f'1px solid {MIN_COLOR_BORDER}')]},
-        {'selector': 'tr:hover td', 'props': [('background-color', '#EFF7FF')]}, # Hover effect
+        {'selector': 'tr:hover td', 'props': [('background-color', '#EFF7FF')]},
         {'selector': 'tr:last-child td', 'props': [('border-bottom', 'none')]},
     ])
 
@@ -116,9 +181,8 @@ def style_table_minimal(df_to_style):
             if val > 0: return f'color: {MIN_COLOR_POSITIVE};'
             if val < 0: return f'color: {MIN_COLOR_NEGATIVE};'
         return ''
-    styled_df = styled_df.map(color_values, subset=numeric_cols) # map is correct for element-wise
+    styled_df = styled_df.map(color_values, subset=numeric_cols)
 
-    # Net cashflow row styling - CORRECTED
     if not df_to_style.empty and ("Net Cashflow", "") in df_to_style.index:
         def highlight_net_cashflow_row(row_series):
             if row_series.name == ("Net Cashflow", ""):
@@ -137,7 +201,7 @@ with st.sidebar:
             "Party Type": ["Supplier", "Customer", "Supplier"],
             "Party Name": ["ABC Ltd", "XYZ Inc", "DEF Corp"],
             "Due Date": ["2024-07-15", "2024-07-10", "2024-07-20"],
-            "Expected Date": ["2024-07-20", "2024-07-14", "2024-07-22"], # Sample dates
+            "Expected Date": ["2024-07-20", "2024-07-14", "2024-07-22"],
             "Amount": [-10000, 15000, -7500]
         })
         st.download_button(
@@ -156,76 +220,13 @@ with st.sidebar:
 # --- Main Content ---
 if uploaded_file:
     with st.spinner("Processing data..."):
-        try:
-            if uploaded_file.name.endswith(".csv"):
-                df = pd.read_csv(uploaded_file)
-            else:
-                df = pd.read_excel(uploaded_file, engine='openpyxl')
+        df, final_table, processing_status = process_data(uploaded_file)  # Call data processing function
 
-            required_cols = {"party type", "party name", "due date", "expected date", "amount"}
-            df.columns = df.columns.str.lower().str.strip()
-            missing_cols = required_cols - set(df.columns)
-            if missing_cols:
-                st.error(f"Missing columns: {', '.join(missing_cols)}")
-                st.stop()
-
-            df = df.dropna(subset=['party type', 'party name']) # party type / name are essential
-            df['amount'] = pd.to_numeric(df['amount'], errors='coerce').fillna(0)
-            for col in ["due date", "expected date"]:
-                df[col] = pd.to_datetime(df[col], errors='coerce')
-            df = df.dropna(subset=["due date", "expected date", "amount"]) # Ensure dates and amount are valid
-
-            if df.empty:
-                st.warning("No valid data found after cleaning. Please check your file.")
-                st.stop()
-
-            df["allocation date"] = df[["due date", "expected date"]].max(axis=1)
-            df["week_start"] = df["allocation date"].dt.to_period("W").dt.start_time
-
-            # CORRECTED: Ensure chronological order for week_range
-            df = df.sort_values("week_start")
-            df["week_range"] = df["week_start"].apply(format_week_range)
-            ordered_week_ranges = df["week_range"].unique()
-            df["week_range"] = pd.Categorical(df["week_range"], categories=ordered_week_ranges, ordered=True)
-
-            pivot_table = df.pivot_table(
-                index=["party type", "party name"],
-                columns="week_range",
-                values="amount",
-                aggfunc="sum",
-                fill_value=0
-            )
-            # Ensure columns in pivot table also follow the order if any are missing from data
-            # This can happen if some weeks have no data items but are part of the overall range
-            # For this specific setup, pivot_table will only have columns for which data exists.
-            # If we want all weeks in a range, we might need to reindex.
-            # For now, using existing columns from pivot_table.columns which should be CategoricalIndex.
-
-            if pivot_table.empty and not df.empty: # Data exists, but pivot is empty (e.g. only one type/name, so index is not Multi)
-                 st.warning("Could not create a pivot table. This might happen if data structure is not suitable for pivoting as configured (e.g. not enough distinct party types/names).")
-                 # Try a simpler pivot or inform user
-            
-            if not pivot_table.columns.empty:
-                net_row_values = pivot_table.sum()
-                net_row = pd.DataFrame(
-                    [net_row_values.values], # Use .values to ensure data alignment
-                    index=pd.MultiIndex.from_tuples([("Net Cashflow", "")]),
-                    columns=net_row_values.index # Preserve CategoricalIndex from pivot_table.columns
-                )
-                final_table = pd.concat([pivot_table, net_row])
-            elif not df.empty : # pivot_table columns are empty, means no weekly data was aggregated
-                # Create an empty final_table with correct structure for display, or handle message
-                st.info("No weekly data to display in the forecast table.")
-                # Create a dummy final_table for styling or skip tab1 display
-                final_table = pd.DataFrame(columns=['No Data Available']).set_index(pd.MultiIndex.from_tuples([("Net Cashflow", "")]))
-
-            else: # df was empty to begin with, this case is already handled by st.stop()
-                final_table = pd.DataFrame() # Should not be reached if df.empty leads to st.stop()
-
+        if processing_status == "OK":
             st.subheader("Financial Overview")
             col1, col2, col3 = st.columns(3)
             total_inflow = df[df['amount'] > 0]['amount'].sum()
-            total_outflow = df[df['amount'] < 0]['amount'].sum() # This is negative
+            total_outflow = df[df['amount'] < 0]['amount'].sum()
             net_cashflow_total = total_inflow + total_outflow
 
             with col1:
@@ -241,11 +242,10 @@ if uploaded_file:
             with tab1:
                 st.markdown("#### Weekly Cashflow Forecast")
                 if not final_table.empty and not ("No Data Available" in final_table.columns):
-                     # Use a slightly modified style_table for this specific table if needed
                     st.markdown(style_table_minimal(final_table).to_html(), unsafe_allow_html=True)
                 elif "No Data Available" in final_table.columns:
                     st.info("No weekly forecast data to display.")
-                else: # final_table is completely empty
+                else:
                     st.info("No data to display in the forecast table.")
 
 
@@ -253,15 +253,12 @@ if uploaded_file:
                 st.markdown("#### Net Cashflow Trend")
                 if not final_table.empty and ("Net Cashflow", "") in final_table.index and not final_table.columns.empty and not ("No Data Available" in final_table.columns):
                     net_series = final_table.loc[("Net Cashflow", "")]
-                    # CORRECTED: Prepare data for Altair
                     net_data = net_series.reset_index()
-                    # The value column name is the name of the series, which is ("Net Cashflow", "")
-                    # The index column name is final_table.columns.name, which is "week_range"
                     net_data.rename(columns={("Net Cashflow", ""): 'Net_Cashflow_Value', 'week_range': 'Week'}, inplace=True)
 
                     if not net_data.empty:
                         chart = alt.Chart(net_data).mark_bar().encode(
-                            x=alt.X('Week:N', title='Week', sort=None), # Use 'Week' and sort=None due to Categorical
+                            x=alt.X('Week:N', title='Week', sort=None),
                             y=alt.Y('Net_Cashflow_Value:Q', title='Amount (USD)'),
                             tooltip=['Week', alt.Tooltip('Net_Cashflow_Value:Q', format=",.0f")],
                             color=alt.condition(
@@ -283,18 +280,16 @@ if uploaded_file:
             with tab3:
                 st.markdown("#### Raw Input Data (Processed)")
                 st.dataframe(df, use_container_width=True)
-                
+
                 if not final_table.empty and not ("No Data Available" in final_table.columns):
                     towrite = BytesIO()
-                    # xlsxwriter cannot handle CategoricalIndex directly in older versions for sheet names etc.
-                    # but writing data should be fine. For safety, convert to string if issues.
                     export_df = final_table.copy()
                     if isinstance(export_df.columns, pd.CategoricalIndex):
                         export_df.columns = export_df.columns.astype(str)
 
                     with pd.ExcelWriter(towrite, engine='xlsxwriter') as writer:
                         export_df.to_excel(writer, sheet_name="Forecast")
-                    
+
                     st.download_button(
                         label="📥 Export Forecast to Excel",
                         data=towrite.getvalue(),
@@ -303,12 +298,7 @@ if uploaded_file:
                     )
                 else:
                     st.info("No forecast data to export.")
-
-        except Exception as e:
-            st.error(f"An error occurred during processing: {str(e)}")
-            import traceback
-            st.error(f"Traceback: {traceback.format_exc()}")
-
+        #elif status != "OK" will already have been handled by the process_data function using st.error or st.info
 
 else:
     st.info("👋 Welcome! Please upload a cashflow data file using the sidebar to begin analysis.")
