@@ -1,10 +1,10 @@
-[server]
-headless = true
-
 [theme]
-base = "light"
-primaryColor = "#1f77b4"
-backgroundColor = "#f7f9fc"
-secondaryBackgroundColor = "#ffffff"
-textColor = "#000000"
-font = "sans serif"
+primaryColor="#007bff"
+backgroundColor="#ffffff"
+secondaryBackgroundColor="#f0f2f6"
+textColor="#262730"
+font="sans serif"
+
+# For dark theme (if Streamlit auto-detects or user selects)
+# You would define a corresponding dark theme palette here.
+# Streamlit handles switching these variables.
